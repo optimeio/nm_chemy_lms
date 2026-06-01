@@ -1,0 +1,17 @@
+{
+  "name": "sritech-fullstack",
+  "version": "1.0.0",
+  "description": "Fullstack SriTech Ecommerce Application",
+  "main": "index.js",
+  "scripts": {
+    "server": "npm start --prefix Backend",
+    "client": "npm run dev --prefix Frontend",
+    "dev": "concurrently \"npm run server\" \"npm run client\""
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "dependencies": {
+    "node-fetch": "^2.7.0"
+  }
+}

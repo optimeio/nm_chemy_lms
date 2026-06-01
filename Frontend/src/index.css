@@ -1,0 +1,2046 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+:root {
+    --primary-color: #16a34a; /* Forest Green */
+    --primary-light: #4ade80;
+    --primary-dark: #15803d;
+    --accent-color: #f59e0b; /* Amber accent */
+    --accent-yellow: #fbbf24; /* Yellow */
+    --bg-color: #ffffff;
+    --bg-secondary: #f0fdf4; /* Light Green Background */
+    --text-main: #14532d; /* Deep Green Text */
+    --text-muted: #6b7280; /* Gray */
+    --border-color: #d1fae5;
+    --success-color: #16a34a; /* Green */
+    --transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+html {
+    scroll-behavior: smooth;
+}
+
+body {
+    background-color: var(--bg-secondary);
+    color: var(--text-main);
+    line-height: 1.4;
+    overflow-x: hidden;
+}
+
+/* --- Flipkart Blue Top Header --- */
+.top-header {
+    width: 100%;
+    background-color: var(--primary-color);
+    padding: 0.75rem 0;
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.header-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 1.5rem;
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 2rem;
+}
+
+/* Brand Logo (Flipkart-Style) */
+.logo {
+    text-decoration: none;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    line-height: 1;
+}
+
+.logo img {
+    height: 24px;
+    display: block;
+}
+
+.logo-main-text {
+    font-size: 1.3rem;
+    font-weight: 800;
+    color: white;
+    font-style: italic;
+    letter-spacing: 0.3px;
+    display: flex;
+    align-items: center;
+}
+
+.logo-sub-text {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: #f0f0f0;
+    font-style: italic;
+    margin-top: 2px;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+
+.logo-sub-text span {
+    color: var(--accent-yellow);
+    font-weight: 800;
+}
+
+/* Search Bar (Flipkart-Style) */
+.search-container {
+    display: flex;
+    align-items: center;
+    background: white;
+    border-radius: 2px;
+    padding: 0.4rem 1rem;
+    width: 100%;
+    max-width: 560px;
+    box-shadow: 0 2px 4px 0 rgba(0,0,0,0.1);
+    position: relative;
+}
+
+.search-input {
+    width: 100%;
+    border: none !important;
+    outline: none !important;
+    background: transparent;
+    font-size: 0.9rem;
+    color: var(--text-main);
+    padding: 2px 0;
+}
+
+.search-input::placeholder {
+    color: #9f9f9f;
+}
+
+.search-icon-inside {
+    color: var(--primary-color);
+    font-size: 1.1rem;
+    cursor: pointer;
+}
+
+/* Header Actions */
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 2rem;
+}
+
+.action-btn {
+    background: none;
+    border: none;
+    font-size: 1.1rem;
+    color: white;
+    cursor: pointer;
+    transition: var(--transition);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.action-btn:hover {
+    opacity: 0.9;
+}
+
+.header-login-btn {
+    background-color: white;
+    color: var(--primary-color);
+    padding: 0.35rem 2.5rem;
+    border-radius: 2px;
+    font-weight: 600;
+    border: 1px solid white;
+    cursor: pointer;
+    font-size: 0.95rem;
+    transition: var(--transition);
+}
+
+.header-login-btn:hover {
+    background-color: rgba(255, 255, 255, 0.9);
+}
+
+.cart-btn {
+    position: relative;
+}
+
+.cart-btn .cart-count {
+    background-color: var(--accent-color);
+    color: white;
+    font-size: 0.65rem;
+    font-weight: 800;
+    padding: 1px 6px;
+    border-radius: 10px;
+    position: absolute;
+    top: -10px;
+    right: -12px;
+    border: 1px solid var(--primary-color);
+}
+
+/* --- Category Bar (Flipkart-Style) --- */
+.category-bar-wrapper {
+    background-color: white;
+    border-bottom: 1px solid var(--border-color);
+    box-shadow: 0 1px 1px 0 rgba(0,0,0,0.05);
+    width: 100%;
+}
+
+.category-bar-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0.75rem 1.5rem;
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    overflow-x: auto;
+    gap: 1rem;
+}
+
+.category-bar-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-decoration: none;
+    color: var(--text-main);
+    font-weight: 600;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: var(--transition);
+    gap: 6px;
+    flex-shrink: 0;
+    border: none;
+    background: transparent;
+}
+
+.category-bar-item i {
+    font-size: 1.4rem;
+    color: var(--primary-color);
+    transition: var(--transition);
+}
+
+.category-bar-item:hover {
+    color: var(--primary-color);
+}
+
+.category-bar-item.active {
+    color: var(--primary-color);
+}
+
+.category-bar-item.active i {
+    transform: scale(1.1);
+}
+
+/* --- Main Layout --- */
+.app-wrapper {
+    max-width: 1200px;
+    margin: 1rem auto;
+    padding: 0 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+/* Promotion/Offer Banner (Flipkart-Style Carousel) */
+.promo-carousel {
+    width: 100%;
+    background-color: white;
+    border-radius: 4px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    overflow: hidden;
+    position: relative;
+    border: 1px solid var(--border-color);
+}
+
+.promo-banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 2.5rem 4rem;
+    background: linear-gradient(135deg, #14532d 0%, #16a34a 100%);
+    color: white;
+}
+
+.promo-banner-content {
+    max-width: 600px;
+}
+
+.promo-banner-content h2 {
+    font-size: 2.2rem;
+    font-weight: 800;
+    margin-bottom: 0.75rem;
+    letter-spacing: -0.5px;
+}
+
+.promo-banner-content p {
+    font-size: 1.1rem;
+    opacity: 0.9;
+    margin-bottom: 1.5rem;
+}
+
+.promo-badge {
+    background-color: var(--accent-color);
+    color: white;
+    display: inline-block;
+    padding: 0.4rem 1rem;
+    font-weight: 800;
+    font-size: 0.85rem;
+    border-radius: 2px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.promo-banner-action {
+    background-color: var(--accent-color);
+    color: white;
+    padding: 0.8rem 2.5rem;
+    border: none;
+    border-radius: 2px;
+    font-weight: 700;
+    cursor: pointer;
+    font-size: 1rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    transition: var(--transition);
+}
+
+.promo-banner-action:hover {
+    background-color: #e68f00;
+}
+
+/* Deals / Products Section Grid */
+.products-section {
+    background-color: white;
+    padding: 1.5rem;
+    border-radius: 4px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    border: 1px solid var(--border-color);
+}
+
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.section-header h2 {
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: var(--text-main);
+}
+
+.section-header p {
+    font-size: 0.9rem;
+    color: var(--text-muted);
+}
+
+/* --- Flipkart-Style Product Grid & Cards --- */
+.product-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 1.25rem;
+}
+
+.product-card {
+    background-color: white;
+    border-radius: 4px;
+    border: 1px solid #f0f0f0;
+    overflow: hidden;
+    transition: var(--transition);
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    padding: 1rem;
+    cursor: pointer;
+}
+
+.product-card:hover {
+    box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+    border-color: #e0e0e0;
+}
+
+.product-card:hover .hover-zoom {
+    transform: scale(1.05);
+}
+
+.product-img {
+    height: 180px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+    margin-bottom: 1rem;
+    background-color: white;
+    overflow: hidden;
+}
+
+.product-img img {
+    max-height: 100%;
+    max-width: 100%;
+    object-fit: contain;
+    transition: var(--transition);
+}
+
+.placeholder-img {
+    font-size: 4rem;
+    color: var(--primary-light);
+    opacity: 0.3;
+}
+
+/* Wishlist Heart on Product Card */
+.like-btn {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    background: white;
+    border: 1px solid #f0f0f0;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    transition: var(--transition);
+    color: #c2c2c2;
+    z-index: 10;
+}
+
+.like-btn:hover {
+    color: #ef4444;
+    transform: scale(1.1);
+}
+
+.like-btn.active {
+    color: #ef4444;
+}
+
+/* Info Section */
+.product-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    text-align: left;
+    flex: 1;
+}
+
+.product-info h3 {
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--text-main);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-bottom: 2px;
+}
+
+/* Rating Badge (Flipkart-Style) */
+.rating-badge {
+    background-color: var(--success-color);
+    color: white;
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 3px;
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    width: fit-content;
+}
+
+.rating-badge i {
+    font-size: 0.65rem;
+}
+
+.rating-count {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    font-weight: 500;
+}
+
+/* Price Section (Flipkart-Style) */
+.price-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 4px;
+}
+
+.price-row .price {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--text-main);
+}
+
+.price-row .original-price {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    text-decoration: line-through;
+}
+
+.price-row .discount {
+    font-size: 0.85rem;
+    color: var(--success-color);
+    font-weight: 700;
+}
+
+/* Flipkart Assured Badge */
+.assured-badge-container {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 4px;
+}
+
+.assured-tag {
+    font-size: 0.65rem;
+    font-weight: 800;
+    font-style: italic;
+    color: var(--primary-color);
+    background-color: #f1f3f6;
+    padding: 1px 4px;
+    border-radius: 2px;
+    display: flex;
+    align-items: center;
+    border: 1.5px solid var(--primary-light);
+}
+
+.assured-tag span {
+    color: var(--accent-color);
+}
+
+.free-delivery-tag {
+    font-size: 0.75rem;
+    color: var(--success-color);
+    font-weight: 600;
+}
+
+/* Buy/Cart Action Row inside Card */
+.product-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+    margin-top: 1rem;
+}
+
+.add-to-cart {
+    background: linear-gradient(135deg, var(--accent-color) 0%, #fb641b 100%);
+    color: white;
+    border: none;
+    padding: 0.65rem;
+    border-radius: 8px;
+    font-weight: 700;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    box-shadow: 0 4px 12px rgba(255, 159, 0, 0.25);
+}
+
+.add-to-cart:hover {
+    background: linear-gradient(135deg, #fb641b 0%, var(--accent-color) 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(255, 159, 0, 0.35);
+}
+
+.add-to-cart:active {
+    transform: translateY(0);
+}
+
+.buy-now-btn {
+    background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
+    color: white;
+    border: none;
+    padding: 0.65rem;
+    border-radius: 8px;
+    font-weight: 700;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    box-shadow: 0 4px 12px rgba(22, 163, 74, 0.25);
+}
+
+.buy-now-btn:hover {
+    background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary-color) 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(22, 163, 74, 0.35);
+}
+
+.buy-now-btn:active {
+    transform: translateY(0);
+}
+
+/* Empty State Styling */
+.empty-state {
+    padding: 4rem 2rem;
+    text-align: center;
+    background-color: white;
+    border-radius: 4px;
+    border: 1px solid var(--border-color);
+}
+
+.empty-state h3 {
+    font-size: 1.2rem;
+    color: var(--text-main);
+}
+
+/* --- Detail Modal Styling (Flipkart-Style Product View) --- */
+.modal-content.detail-modal {
+    max-width: 860px;
+    width: 95%;
+    padding: 2rem;
+    border-radius: 16px;
+    box-shadow: 0 25px 70px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.6);
+    background: linear-gradient(135deg, #ffffff 0%, #fafafa 100%);
+}
+
+.detail-modal-body {
+    display: grid;
+    grid-template-columns: 40% 60%;
+    gap: 2rem;
+}
+
+.product-slider {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.slider-main-image {
+    height: 300px;
+    background-color: white;
+    border: 1px solid var(--border-color);
+    border-radius: 2px;
+}
+
+.slider-arrow {
+    background-color: rgba(255, 255, 255, 0.85);
+    border: 1px solid var(--border-color);
+    width: 36px;
+    height: 36px;
+    color: var(--primary-color);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+}
+
+.slider-thumbnails {
+    padding: 4px 0;
+}
+
+.thumbnail-btn {
+    width: 50px;
+    height: 50px;
+    border: 1px solid var(--border-color);
+    border-radius: 2px;
+}
+
+.thumbnail-btn.active {
+    border-color: var(--primary-color);
+    border-width: 2px;
+}
+
+/* Detail Right Pane */
+.product-detail-info {
+    text-align: left;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+}
+
+.product-detail-info .category-badge {
+    background-color: var(--bg-secondary);
+    color: var(--primary-color);
+    font-size: 0.75rem;
+    padding: 2px 8px;
+    border-radius: 2px;
+    font-weight: 700;
+    width: fit-content;
+    border: 1px solid var(--border-color);
+}
+
+.product-detail-info h2 {
+    font-size: 1.4rem;
+    font-weight: 600;
+    color: var(--text-main);
+    line-height: 1.3;
+}
+
+.product-detail-info .price-tag {
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: var(--text-main);
+    margin: 8px 0;
+}
+
+.product-detail-info .description-text {
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    line-height: 1.5;
+}
+
+.product-detail-info .actions-row {
+    display: flex;
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.product-detail-info .actions-row button {
+    flex: 1;
+    padding: 0.85rem;
+    font-size: 0.95rem;
+    border-radius: 2px;
+    text-transform: uppercase;
+}
+
+/* --- General Modal/Dialog Overlays --- */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 2000;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    padding: 1rem;
+}
+
+.modal-overlay.active {
+    opacity: 1;
+    visibility: visible;
+}
+
+.modal-content {
+    background-color: white;
+    padding: 2rem;
+    border-radius: 16px;
+    width: 90%;
+    max-width: 440px;
+    position: relative;
+    transform: scale(0.9) rotateX(10deg);
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    border: 1px solid rgba(219, 219, 219, 0.5);
+    box-shadow: 0 20px 60px rgba(0,0,0,0.15), 0 0 1px rgba(0,0,0,0.05);
+}
+
+.modal-overlay.active .modal-content {
+    transform: scale(1) rotateX(0deg);
+    box-shadow: 0 25px 70px rgba(0,0,0,0.2), 0 0 2px rgba(0,0,0,0.1);
+}
+
+@keyframes modalBounce {
+    0%, 100% { transform: scale(1) rotateX(0deg); }
+    50% { transform: scale(1.02) rotateX(0deg); }
+}
+
+.modal-overlay.active .modal-content {
+    animation: modalBounce 0.5s ease-out;
+}
+
+.close-modal {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    background: linear-gradient(135deg, rgba(240, 240, 240, 0.8), rgba(220, 220, 220, 0.8));
+    border: 1px solid rgba(150, 150, 150, 0.2);
+    font-size: 1.8rem;
+    color: #666;
+    cursor: pointer;
+    line-height: 1;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    backdrop-filter: blur(10px);
+}
+
+.close-modal:hover {
+    color: var(--primary-color);
+    background: linear-gradient(135deg, rgba(22, 163, 74, 0.1), rgba(21, 128, 61, 0.1));
+    border-color: var(--primary-color);
+    transform: rotate(90deg) scale(1.1);
+    box-shadow: 0 4px 12px rgba(22, 163, 74, 0.2);
+}
+
+/* Form Styling */
+.modal-header {
+    margin-bottom: 1.5rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid rgba(219, 219, 219, 0.3);
+}
+
+.modal-header h2 {
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: var(--primary-color);
+    margin: 0 0 0.5rem 0;
+    letter-spacing: -0.5px;
+}
+
+.modal-header p {
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    margin: 0;
+    line-height: 1.5;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-bottom: 1.25rem;
+}
+
+.form-group label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #444;
+}
+
+.form-group input, .form-group select, .form-group textarea {
+    padding: 0.75rem;
+    border: 1.5px solid #e0e0e0;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    outline: none;
+    background: #fafafa;
+    transition: all 0.2s ease;
+}
+
+.form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+    border-color: var(--primary-color);
+    background: white;
+    box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.1);
+    transform: translateY(-2px);
+}
+
+/* CTA Button Styling */
+.cta-button {
+    background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 0.85rem 1.5rem;
+    font-weight: 700;
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    box-shadow: 0 4px 12px rgba(22, 163, 74, 0.3);
+    position: relative;
+    overflow: hidden;
+}
+
+.cta-button::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: rgba(255, 255, 255, 0.2);
+    transition: left 0.3s ease;
+    z-index: 0;
+}
+
+.cta-button:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 20px rgba(22, 163, 74, 0.4);
+}
+
+.cta-button:hover::before {
+    left: 100%;
+}
+
+.cta-button:active {
+    transform: translateY(-1px);
+}
+
+/* Footer (Flipkart-Style Dark Gray Footer) */
+.footer {
+    background-color: #172337;
+    color: white;
+    padding: 3rem 1.5rem 1.5rem;
+    margin-top: 2rem;
+    border-top: 1px solid #3a4b64;
+}
+
+.footer-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 2.5rem;
+    padding-bottom: 2rem;
+}
+
+.footer-logo {
+    color: white;
+    font-size: 1.4rem;
+    font-weight: 700;
+    text-decoration: none;
+    font-style: italic;
+    margin-bottom: 1rem;
+    display: block;
+}
+
+.footer-logo span {
+    color: var(--accent-yellow);
+}
+
+.footer-details p {
+    color: #aeaeae;
+    font-size: 0.85rem;
+    margin-bottom: 0.5rem;
+}
+
+.footer-links h3, .complaint-box h3 {
+    font-size: 0.85rem;
+    color: #878787;
+    text-transform: uppercase;
+    margin-bottom: 1rem;
+    font-weight: 600;
+}
+
+.footer-links {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.footer-links a {
+    color: white;
+    font-size: 0.85rem;
+    text-decoration: none;
+    transition: var(--transition);
+}
+
+.footer-links a:hover {
+    text-decoration: underline;
+}
+
+.complaint-box form {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.complaint-box input {
+    background-color: white;
+    color: var(--text-main);
+    border: none;
+    border-radius: 2px;
+    padding: 0.5rem;
+    font-size: 0.85rem;
+}
+
+.submit-btn {
+    background-color: var(--accent-color);
+    color: white;
+    border: none;
+    border-radius: 2px;
+    padding: 0.5rem 1rem;
+    font-weight: 700;
+    cursor: pointer;
+    font-size: 0.85rem;
+}
+
+.submit-btn:hover {
+    background-color: #e68f00;
+}
+
+.footer-bottom {
+    text-align: center;
+    border-top: 1px solid #3a4b64;
+    padding-top: 1.5rem;
+    font-size: 0.8rem;
+    color: #aeaeae;
+}
+
+/* Toast Popups - Enhanced Styling */
+.toast-popup {
+    position: fixed;
+    bottom: 2rem;
+    right: 2rem;
+    border-radius: 12px;
+    font-size: 0.95rem;
+    padding: 1rem 1.5rem;
+    color: white;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+    animation: slideInUp 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    z-index: 5000;
+    max-width: 90vw;
+    min-width: 250px;
+    font-weight: 500;
+    backdrop-filter: blur(10px);
+}
+
+@keyframes slideInUp {
+    from {
+        transform: translateY(200%) translateX(0);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0) translateX(0);
+        opacity: 1;
+    }
+}
+
+@keyframes slideOutDown {
+    from {
+        transform: translateY(0) translateX(0);
+        opacity: 1;
+    }
+    to {
+        transform: translateY(200%) translateX(0);
+        opacity: 0;
+    }
+}
+
+.toast-popup.success {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.toast-popup.success::before {
+    content: "✓";
+    font-size: 1.4rem;
+    font-weight: bold;
+}
+
+.toast-popup.error {
+    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.toast-popup.error::before {
+    content: "✕";
+    font-size: 1.4rem;
+    font-weight: bold;
+}
+
+@media (max-width: 768px) {
+    .toast-popup {
+        bottom: 1rem;
+        right: 1rem;
+        left: 1rem;
+        min-width: unset;
+    }
+}
+
+/* --- Cart & wishlist dropdown lists --- */
+.modal-item-list {
+    max-height: 300px;
+}
+
+.modal-item-card {
+    border-radius: 2px;
+    background-color: #fafafa;
+}
+
+.modal-item-card:hover {
+    border-color: var(--primary-color);
+    box-shadow: none;
+}
+
+.modal-item-price {
+    color: var(--text-main);
+}
+
+.modal-total-section {
+    background-color: #fcfcfc;
+    border-radius: 2px;
+    padding: 1rem;
+}
+
+/* ==========================================================================
+   PREMIUM GLASSMORPHIC ADMIN DASHBOARD SYSTEM
+   ========================================================================== */
+
+/* Container wrapper override for Admin Portal */
+.admin-container {
+    display: flex;
+    min-height: 100vh;
+    background-color: #f8fafc; /* Premium off-white/light gray */
+    color: #0f172a; /* Slate 900 */
+    width: 100%;
+    overflow: hidden;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+/* Light Glassmorphic Sidebar */
+.admin-sidebar {
+    width: 260px;
+    height: 100vh;
+    padding: 2rem 1.5rem;
+    display: flex;
+    flex-direction: column;
+    position: sticky;
+    top: 0;
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-right: 1px solid #e2e8f0;
+    z-index: 100;
+}
+
+.admin-logo {
+    font-size: 1.4rem;
+    font-weight: 800;
+    color: #0f172a;
+    letter-spacing: 0.5px;
+    margin-bottom: 2.5rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-style: normal !important;
+}
+
+.admin-logo i {
+    color: #16a34a; /* Green Accent */
+    text-shadow: 0 0 10px rgba(22, 163, 74, 0.2);
+}
+
+.admin-logo span {
+    color: #15803d; /* Dark Green Accent */
+    font-size: 0.75rem;
+    background: rgba(22, 163, 74, 0.08);
+    padding: 2px 6px;
+    border-radius: 4px;
+    border: 1px solid rgba(22, 163, 74, 0.15);
+}
+
+.admin-nav-menu {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    flex: 1;
+    overflow-y: auto;
+    padding-right: 4px;
+}
+
+/* Custom scrollbar for nav */
+.admin-nav-menu::-webkit-scrollbar {
+    width: 3px;
+}
+.admin-nav-menu::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.05);
+    border-radius: 10px;
+}
+
+.admin-nav-item {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+    padding: 0.8rem 1.2rem;
+    border: none;
+    background: transparent;
+    border-radius: 10px;
+    color: #475569; /* Slate 600 */
+    font-weight: 500;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: var(--transition);
+    text-align: left;
+    width: 100%;
+}
+
+.admin-nav-item i {
+    font-size: 1.05rem;
+    width: 20px;
+    opacity: 0.8;
+    transition: var(--transition);
+}
+
+.admin-nav-item:hover {
+    background: rgba(22, 163, 74, 0.04);
+    color: #14532d;
+}
+
+.admin-nav-item:hover i {
+    opacity: 1;
+    color: #16a34a;
+}
+
+.admin-nav-item.active {
+    background: linear-gradient(135deg, #16a34a 0%, #4ade80 100%);
+    color: white;
+    font-weight: 600;
+    box-shadow: 0 4px 15px rgba(22, 163, 74, 0.25);
+}
+
+.admin-nav-item.active i {
+    opacity: 1;
+    color: white;
+}
+
+.admin-logout-btn {
+    margin-top: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+    padding: 0.8rem 1.2rem;
+    border: 1px solid rgba(239, 68, 68, 0.2);
+    background: rgba(239, 68, 68, 0.05);
+    color: #dc2626;
+    border-radius: 10px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition);
+    width: 100%;
+}
+
+.admin-logout-btn:hover {
+    background: #ef4444;
+    color: white;
+    border-color: #ef4444;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.15);
+}
+
+/* Admin Main Pane */
+.admin-main {
+    flex: 1;
+    padding: 1.5rem 2.5rem;
+    overflow-y: auto;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+/* Light Premium Header */
+.admin-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.75);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    padding: 1rem 2rem;
+    border-radius: 15px;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.02), 0 2px 4px -2px rgba(0, 0, 0, 0.02);
+}
+
+.admin-header h1 {
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: #0f172a;
+    margin: 0;
+}
+
+.admin-profile {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.admin-info {
+    display: flex;
+    flex-direction: column;
+    text-align: right;
+}
+
+.admin-name {
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: #0f172a;
+}
+
+.admin-role {
+    font-size: 0.75rem;
+    color: #64748b;
+}
+
+.admin-avatar {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    border: 2px solid rgba(22, 163, 74, 0.2);
+    background: #f8fafc;
+    overflow: hidden;
+}
+
+/* Pulsing dot for System Status */
+.status-pulse-dot {
+    width: 8px;
+    height: 8px;
+    background-color: #10b981;
+    border-radius: 50%;
+    display: inline-block;
+    box-shadow: 0 0 8px #10b981;
+    animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+    0% { transform: scale(0.9); opacity: 0.6; }
+    50% { transform: scale(1.2); opacity: 1; box-shadow: 0 0 12px #10b981; }
+    100% { transform: scale(0.9); opacity: 0.6; }
+}
+
+/* Styled Action Buttons in Header */
+.refresh-btn {
+    background: rgba(0, 0, 0, 0.02) !important;
+    border: 1px solid #cbd5e1 !important;
+    color: #475569 !important;
+    padding: 0.5rem 1rem !important;
+    border-radius: 8px !important;
+    font-size: 0.85rem !important;
+    cursor: pointer;
+    transition: var(--transition);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    height: 38px;
+}
+
+.refresh-btn:hover {
+    background: rgba(0, 0, 0, 0.05) !important;
+    color: #0f172a !important;
+    border-color: #94a3b8 !important;
+}
+
+.header-logout {
+    border: 1px solid rgba(239, 68, 68, 0.2) !important;
+    background: rgba(239, 68, 68, 0.05) !important;
+    color: #dc2626 !important;
+    padding: 0.5rem 1rem !important;
+    border-radius: 8px !important;
+    font-size: 0.85rem !important;
+    height: 38px;
+}
+
+.header-logout:hover {
+    background: #ef4444 !important;
+    color: white !important;
+}
+
+/* Stats Cards Grid */
+.admin-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1.25rem;
+    margin-top: 0;
+}
+
+.stat-card {
+    background: #ffffff;
+    border-radius: 14px;
+    border: 1px solid #e2e8f0;
+    padding: 1.25rem 1.5rem;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    overflow: hidden;
+    transition: var(--transition);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.02), 0 2px 4px -2px rgba(0, 0, 0, 0.02);
+}
+
+.stat-card::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 3px;
+    background: linear-gradient(90deg, #16a34a, #4ade80);
+    opacity: 0.8;
+}
+
+.stat-card:hover {
+    transform: translateY(-2px);
+    border-color: #cbd5e1;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -4px rgba(0, 0, 0, 0.05);
+}
+
+.stat-label {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    color: #64748b;
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.stat-label i {
+    font-size: 1.1rem;
+    color: #16a34a;
+}
+
+.stat-value {
+    font-size: 1.8rem;
+    font-weight: 800;
+    color: #0f172a;
+    margin: 8px 0;
+}
+
+.stat-change {
+    font-size: 0.75rem;
+    color: #64748b;
+    font-weight: 500;
+}
+
+/* Premium White Content Containers */
+.admin-card-glass {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    padding: 1.75rem;
+    margin-bottom: 1.25rem;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.02), 0 2px 4px -2px rgba(0, 0, 0, 0.02);
+}
+
+.admin-card-glass h3 {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #0f172a;
+    margin-bottom: 1.25rem;
+}
+
+/* Polished Table System */
+.admin-table-wrapper {
+    overflow-x: auto;
+    width: 100%;
+}
+
+.admin-table {
+    width: 100%;
+    border-collapse: collapse;
+    text-align: left;
+    font-size: 0.85rem;
+    color: #334155;
+}
+
+.admin-table th {
+    background: rgba(0, 0, 0, 0.01);
+    color: #475569;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 0.9rem 1.25rem;
+    border-bottom: 1.5px solid #e2e8f0;
+    font-size: 0.75rem;
+}
+
+.admin-table td {
+    padding: 0.9rem 1.25rem;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.admin-table tbody tr {
+    transition: var(--transition);
+}
+
+.admin-table tbody tr:hover {
+    background: rgba(0, 0, 0, 0.01);
+    color: #0f172a;
+}
+
+/* Avatar Preview Circle */
+.table-img-circle {
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #f1f5f9;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #e2e8f0;
+}
+
+.table-img-circle img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+/* Status Badges */
+.status-pill {
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    display: inline-block;
+}
+
+.status-pill.active {
+    background: rgba(16, 185, 129, 0.1);
+    color: #059669;
+    border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+.status-pill.blocked {
+    background: rgba(220, 38, 38, 0.1);
+    color: #dc2626;
+    border: 1px solid rgba(220, 38, 38, 0.2);
+}
+
+.status-pill.delivered {
+    background: rgba(16, 185, 129, 0.1);
+    color: #059669;
+    border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+.status-pill.processing {
+    background: rgba(217, 119, 6, 0.1);
+    color: #d97706;
+    border: 1px solid rgba(217, 119, 6, 0.2);
+}
+
+/* Forms in Admin Pane */
+.admin-form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1.25rem;
+}
+
+.admin-form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.admin-form-group label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #475569;
+}
+
+.admin-form-group input, 
+.admin-form-group select, 
+.admin-form-group textarea {
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    color: #0f172a;
+    padding: 0.75rem 1rem;
+    font-size: 0.88rem;
+    outline: none;
+    transition: var(--transition);
+}
+
+.admin-form-group input:focus, 
+.admin-form-group select:focus, 
+.admin-form-group textarea:focus {
+    border-color: #16a34a;
+    background: #ffffff;
+    box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.15);
+}
+
+.admin-form-group select option {
+    background: #ffffff;
+    color: #0f172a;
+}
+
+/* Categories List Grid */
+.admin-category-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 1rem;
+}
+
+.admin-category-card {
+    padding: 1rem 1.25rem;
+    background: #ffffff;
+    border-radius: 10px;
+    border: 1px solid #e2e8f0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: var(--transition);
+}
+
+.admin-category-card:hover {
+    border-color: #4ade80;
+    background: #f0fdf4;
+}
+
+.admin-category-card span {
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: #0f172a;
+}
+
+.admin-category-card i {
+    color: #16a34a;
+    opacity: 0.8;
+}
+
+/* Coupon Card Design */
+.admin-coupon-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 1rem;
+}
+
+.admin-coupon-card {
+    padding: 1.25rem;
+    border: 1.5px dashed rgba(22, 163, 74, 0.3);
+    border-radius: 12px;
+    background: rgba(22, 163, 74, 0.02);
+    color: #14532d;
+    transition: var(--transition);
+    position: relative;
+}
+
+.admin-coupon-card:hover {
+    border-color: #16a34a;
+    background: rgba(22, 163, 74, 0.05);
+}
+
+.admin-coupon-card h4 {
+    font-size: 1.1rem;
+    color: #16a34a;
+    margin-bottom: 4px;
+}
+
+.admin-coupon-card .discount-val {
+    font-size: 1.6rem;
+    font-weight: 800;
+    margin: 4px 0;
+}
+
+.admin-coupon-card .expiry {
+    font-size: 0.75rem;
+    color: #64748b;
+    margin-top: 8px;
+}
+
+/* Support and Ticket Cards */
+.admin-ticket-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.admin-ticket-card {
+    padding: 1.25rem;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    transition: var(--transition);
+}
+
+.admin-ticket-card:hover {
+    border-color: #cbd5e1;
+    background: #f8fafc;
+}
+
+/* Admin Dashboard Action Buttons */
+.admin-btn {
+    padding: 0.6rem 1.25rem;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: var(--transition);
+    border: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.admin-btn-primary {
+    background: linear-gradient(135deg, #16a34a 0%, #4ade80 100%);
+    color: white;
+}
+
+.admin-btn-primary:hover {
+    box-shadow: 0 4px 12px rgba(22, 163, 74, 0.25);
+    transform: translateY(-1px);
+}
+
+.admin-btn-danger {
+    background: rgba(220, 38, 38, 0.1);
+    color: #dc2626;
+    border: 1px solid rgba(220, 38, 38, 0.15);
+}
+
+.admin-btn-danger:hover {
+    background: #dc2626;
+    color: white;
+    border-color: #dc2626;
+}
+
+.admin-btn-success {
+    background: rgba(16, 185, 129, 0.1);
+    color: #059669;
+    border: 1px solid rgba(16, 185, 129, 0.15);
+}
+
+.admin-btn-success:hover {
+    background: #10b981;
+    color: white;
+    border-color: #10b981;
+}
+
+/* Activity Log Timeline entries */
+.admin-log-item {
+    padding: 0.75rem;
+    border-bottom: 1px solid #f1f5f9;
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.85rem;
+    transition: var(--transition);
+}
+
+.admin-log-item:hover {
+    background: rgba(0, 0, 0, 0.01);
+}
+
+.admin-log-item .time {
+    color: #94a3b8;
+    font-size: 0.75rem;
+}
+
+/* Empty State */
+.admin-empty-state {
+    padding: 3rem;
+    text-align: center;
+    color: #94a3b8;
+    font-size: 0.9rem;
+}
+
+/* Responsive Content Override */
+@media (max-width: 900px) {
+    .admin-container {
+        flex-direction: column;
+    }
+    .admin-sidebar {
+        width: 100%;
+        height: auto;
+        border-right: none;
+        border-bottom: 1px solid #e2e8f0;
+        flex-direction: row;
+        overflow-x: auto;
+        padding: 1rem;
+    }
+    .admin-nav-menu {
+        flex-direction: row;
+        gap: 0.5rem;
+    }
+    .admin-nav-item {
+        white-space: nowrap;
+        padding: 0.5rem 1rem;
+    }
+    .admin-logout-btn {
+        margin-top: 0;
+        width: auto;
+    }
+    .admin-main {
+        padding: 1.25rem;
+    }
+}
+
+/* --- Search Suggestions Dropdown (Flipkart / Premium style) --- */
+.search-suggestions-dropdown {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    width: 100%;
+    background: #ffffff;
+    border-radius: 8px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15), 0 1px 3px rgba(0, 0, 0, 0.05);
+    border: 1px solid #e2e8f0;
+    z-index: 1000;
+    max-height: 400px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    padding: 0.5rem 0;
+    animation: slideDownFade 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.search-suggestion-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    cursor: pointer;
+    transition: var(--transition);
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.search-suggestion-item:last-child {
+    border-bottom: none;
+}
+
+.search-suggestion-item:hover {
+    background-color: #f8fafc;
+}
+
+.search-suggestion-img {
+    width: 44px;
+    height: 44px;
+    border-radius: 6px;
+    background-color: #f8fafc;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    flex-shrink: 0;
+    border: 1px solid #e2e8f0;
+}
+
+.search-suggestion-img img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.search-suggestion-img i {
+    font-size: 1.2rem;
+    color: var(--primary-color);
+    opacity: 0.6;
+}
+
+.search-suggestion-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    overflow: hidden;
+}
+
+.search-suggestion-name {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-main);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-align: left;
+}
+
+.search-suggestion-meta {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.75rem;
+}
+
+.search-suggestion-category {
+    color: var(--text-muted);
+    text-transform: capitalize;
+}
+
+.search-suggestion-price {
+    font-weight: 700;
+    color: var(--primary-color);
+}
+
+.search-suggestions-header {
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 0.5rem 1rem 0.25rem 1rem;
+    text-align: left;
+}
+
+.search-suggestions-empty {
+    padding: 2rem 1.5rem;
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+
+.suggestion-view-btn {
+    transition: var(--transition);
+}
+
+.suggestion-view-btn:hover {
+    background-color: var(--primary-dark) !important;
+    transform: translateY(-1px);
+}
+
+@keyframes slideDownFade {
+    from {
+        opacity: 0;
+        transform: translateY(-8px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* --- Hero Section Layout & Styles --- */
+.hero {
+    display: grid;
+    grid-template-columns: 1.2fr 0.8fr;
+    gap: 3rem;
+    align-items: center;
+    padding: 3.5rem 2.5rem;
+    max-width: 1200px;
+    margin: 1rem auto;
+    background: linear-gradient(135deg, #ffffff 0%, #f7fee7 100%);
+    border-radius: 16px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.03);
+    border: 1px solid var(--border-color);
+}
+
+.hero-content {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    text-align: left;
+}
+
+.hero-content h1 {
+    font-size: 2.8rem;
+    font-weight: 800;
+    color: var(--text-main);
+    line-height: 1.25;
+    letter-spacing: -0.5px;
+}
+
+.hero-content p {
+    font-size: 0.98rem;
+    color: var(--text-muted);
+    line-height: 1.65;
+}
+
+.hero-content .cta-button {
+    align-self: flex-start;
+    padding: 0.9rem 2rem;
+    font-size: 1rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.hero-image-carousel {
+    width: 100%;
+    height: 400px;
+    position: relative;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.08);
+    border: 1px solid var(--border-color);
+    background: #f8fafc;
+}
+
+.carousel-slide-container {
+    width: 100%;
+    height: 100%;
+    position: relative;
+}
+
+.carousel-slide {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: white;
+}
+
+.carousel-slide img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.carousel-caption {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.4) 60%, rgba(0,0,0,0) 100%);
+    color: white;
+    padding: 2.5rem 1.5rem 1.5rem;
+    font-size: 1.1rem;
+    font-weight: 600;
+    text-align: center;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+    z-index: 5;
+    letter-spacing: 0.5px;
+}
+
+.carousel-dots {
+    position: absolute;
+    bottom: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 8px;
+    z-index: 10;
+}
+
+.carousel-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.4);
+    border: 1.5px solid rgba(0, 0, 0, 0.1);
+    cursor: pointer;
+    transition: var(--transition);
+    padding: 0;
+}
+
+.carousel-dot:hover {
+    background: rgba(255, 255, 255, 0.8);
+    transform: scale(1.1);
+}
+
+.carousel-dot.active {
+    background: var(--primary-color);
+    border-color: white;
+    transform: scale(1.3);
+    box-shadow: 0 0 10px rgba(22, 163, 74, 0.5);
+}
+
+/* Admin Banner Card styling */
+.admin-banner-card {
+    transition: var(--transition);
+}
+
+.admin-banner-card:hover {
+    transform: translateY(-2px);
+    border-color: var(--primary-light) !important;
+    box-shadow: 0 6px 12px rgba(22, 163, 74, 0.05) !important;
+}
+
+@media (max-width: 900px) {
+    .hero {
+        grid-template-columns: 1fr !important;
+        gap: 2rem !important;
+        padding: 2rem 1.25rem !important;
+    }
+    .hero-image-carousel {
+        height: 280px;
+    }
+    .hero-content h1 {
+        font-size: 2.2rem;
+    }
+}
+
