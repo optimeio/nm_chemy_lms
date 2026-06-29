@@ -26,19 +26,42 @@ function generateId() {
 
 function matchDoc(doc, query) {
   if (!query || Object.keys(query).length === 0) return true;
+
   for (let key in query) {
-    let val = query[key];
-    let docVal = doc[key];
-    
-    // Handle conversions for comparisons
-    if (docVal && typeof docVal === 'object' && docVal.toString) {
-      docVal = docVal.toString();
+    const value = query[key];
+
+    if (key === '$or' && Array.isArray(value)) {
+      if (!value.some(subQuery => matchDoc(doc, subQuery))) {
+        return false;
+      }
+      continue;
     }
-    if (val && typeof val === 'object' && val.toString) {
-      val = val.toString();
+
+    if (key === '$and' && Array.isArray(value)) {
+      if (!value.every(subQuery => matchDoc(doc, subQuery))) {
+        return false;
+      }
+      continue;
     }
-    
-    if (docVal !== val) return false;
+
+    const docVal = doc[key];
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      if ('$in' in value) {
+        return Array.isArray(value.$in) && value.$in.includes(docVal);
+      }
+      if ('$ne' in value) {
+        return docVal !== value.$ne;
+      }
+      if ('$exists' in value) {
+        return (docVal !== undefined) === Boolean(value.$exists);
+      }
+      if ('$regex' in value) {
+        const regex = value.$regex instanceof RegExp ? value.$regex : new RegExp(value.$regex);
+        return regex.test(docVal);
+      }
+    }
+
+    if (docVal !== value) return false;
   }
   return true;
 }
@@ -162,126 +185,148 @@ class MockQuery {
   }
 }
 
-function createModelClass(modelName) {
-  return class Model extends MockDocument {
+function createModelClass(modelName, schema) {
+  const Model = class extends MockDocument {
     constructor(data) {
       super(modelName, data);
     }
+  };
 
-    static find(query) {
-      const promise = Promise.resolve().then(() => {
-        const db = loadDB();
-        const list = db[modelName] || [];
-        const filtered = list.filter(doc => matchDoc(doc, query));
-        return filtered.map(d => new Model(d));
-      });
-      return new MockQuery(promise);
+  if (schema) {
+    if (schema.methods) {
+      Object.assign(Model.prototype, schema.methods);
     }
-
-    static findOne(query) {
-      const promise = Promise.resolve().then(() => {
-        const db = loadDB();
-        const list = db[modelName] || [];
-        const found = list.find(doc => matchDoc(doc, query));
-        return found ? new Model(found) : null;
-      });
-      return new MockQuery(promise);
+    if (schema.statics) {
+      Object.assign(Model, schema.statics);
     }
+  }
 
-    static findById(id) {
-      const promise = Promise.resolve().then(() => {
-        const db = loadDB();
-        const list = db[modelName] || [];
-        const found = list.find(doc => doc._id === id.toString());
-        return found ? new Model(found) : null;
-      });
-      return new MockQuery(promise);
-    }
-
-    static findByIdAndDelete(id) {
-      const promise = Promise.resolve().then(() => {
-        const db = loadDB();
-        const list = db[modelName] || [];
-        const foundIdx = list.findIndex(doc => doc._id === id.toString());
-        if (foundIdx !== -1) {
-          const removed = list.splice(foundIdx, 1)[0];
-          saveDB(db);
-          return new Model(removed);
-        }
-        return null;
-      });
-      return new MockQuery(promise);
-    }
-
-    static findByIdAndUpdate(id, update, options) {
-      const promise = Promise.resolve().then(() => {
-        const db = loadDB();
-        const list = db[modelName] || [];
-        const found = list.find(doc => doc._id === id.toString());
-        if (found) {
-          Object.assign(found, update);
-          saveDB(db);
-          return new Model(found);
-        }
-        return null;
-      });
-      return new MockQuery(promise);
-    }
-
-    static async insertMany(arr) {
-      const db = loadDB();
-      if (!db[modelName]) db[modelName] = [];
-      const docs = arr.map(item => {
-        const doc = new Model(item);
-        const plainDoc = {};
-        for (let key in doc) {
-          if (key !== '_modelName' && typeof doc[key] !== 'function') {
-            plainDoc[key] = doc[key];
-          }
-        }
-        db[modelName].push(plainDoc);
-        return doc;
-      });
-      saveDB(db);
-      return docs;
-    }
-
-    static async deleteMany(query) {
+  Model.find = function(query) {
+    const promise = Promise.resolve().then(() => {
       const db = loadDB();
       const list = db[modelName] || [];
-      const remaining = [];
-      let deletedCount = 0;
-      for (let doc of list) {
-        if (matchDoc(doc, query)) {
-          deletedCount++;
-        } else {
-          remaining.push(doc);
+      const filtered = list.filter(doc => matchDoc(doc, query));
+      return filtered.map(d => new Model(d));
+    });
+    return new MockQuery(promise);
+  };
+
+  Model.findOne = function(query) {
+    const promise = Promise.resolve().then(() => {
+      const db = loadDB();
+      const list = db[modelName] || [];
+      const found = list.find(doc => matchDoc(doc, query));
+      return found ? new Model(found) : null;
+    });
+    return new MockQuery(promise);
+  };
+
+  Model.findById = function(id) {
+    const promise = Promise.resolve().then(() => {
+      const db = loadDB();
+      const list = db[modelName] || [];
+      const found = list.find(doc => doc._id === id.toString());
+      return found ? new Model(found) : null;
+    });
+    return new MockQuery(promise);
+  };
+
+  Model.findByIdAndDelete = function(id) {
+    const promise = Promise.resolve().then(() => {
+      const db = loadDB();
+      const list = db[modelName] || [];
+      const foundIdx = list.findIndex(doc => doc._id === id.toString());
+      if (foundIdx !== -1) {
+        const removed = list.splice(foundIdx, 1)[0];
+        saveDB(db);
+        return new Model(removed);
+      }
+      return null;
+    });
+    return new MockQuery(promise);
+  };
+
+  Model.findByIdAndUpdate = function(id, update) {
+    const promise = Promise.resolve().then(() => {
+      const db = loadDB();
+      const list = db[modelName] || [];
+      const found = list.find(doc => doc._id === id.toString());
+      if (found) {
+        Object.assign(found, update);
+        saveDB(db);
+        return new Model(found);
+      }
+      return null;
+    });
+    return new MockQuery(promise);
+  };
+
+  Model.insertMany = async function(arr) {
+    const db = loadDB();
+    if (!db[modelName]) db[modelName] = [];
+    const docs = arr.map(item => {
+      const doc = new Model(item);
+      const plainDoc = {};
+      for (let key in doc) {
+        if (key !== '_modelName' && typeof doc[key] !== 'function') {
+          plainDoc[key] = doc[key];
         }
       }
-      db[modelName] = remaining;
-      saveDB(db);
-      return { deletedCount };
-    }
-
-    static countDocuments(query) {
-      const promise = Promise.resolve().then(() => {
-        const db = loadDB();
-        const list = db[modelName] || [];
-        return list.filter(doc => matchDoc(doc, query)).length;
-      });
-      return new MockQuery(promise);
-    }
+      db[modelName].push(plainDoc);
+      return doc;
+    });
+    saveDB(db);
+    return docs;
   };
+
+  Model.deleteMany = async function(query) {
+    const db = loadDB();
+    const list = db[modelName] || [];
+    const remaining = [];
+    let deletedCount = 0;
+    for (let doc of list) {
+      if (matchDoc(doc, query)) {
+        deletedCount++;
+      } else {
+        remaining.push(doc);
+      }
+    }
+    db[modelName] = remaining;
+    saveDB(db);
+    return { deletedCount };
+  };
+
+  Model.countDocuments = function(query) {
+    const promise = Promise.resolve().then(() => {
+      const db = loadDB();
+      const list = db[modelName] || [];
+      return list.filter(doc => matchDoc(doc, query)).length;
+    });
+    return new MockQuery(promise);
+  };
+
+  return Model;
 }
 
 class Schema {
   constructor(definition) {
     this.definition = definition;
+    this.methods = {};
+    this.statics = {};
+    this.virtuals = {};
+    this.options = {};
   }
+
   index() {}
   pre() {}
   post() {}
   plugin() {}
+  method(name, fn) {
+    this.methods[name] = fn;
+  }
+  statics(name, fn) {
+    this.statics[name] = fn;
+  }
 }
 
 Schema.Types = {
@@ -295,7 +340,7 @@ function model(name, schema) {
     return models[name];
   }
   if (!models[name]) {
-    models[name] = createModelClass(name);
+    models[name] = createModelClass(name, schema);
   }
   return models[name];
 }

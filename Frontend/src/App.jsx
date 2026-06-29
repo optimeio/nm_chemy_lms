@@ -1,8 +1,29 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import './index.css'
+import { createPortal } from 'react-dom'
 import AdminDashboard from './AdminDashboard'
 
-const API_URL = 'http://localhost:5000/api';
+const API_URL = '/api';
+
+const normalizeImageValue = (image, { cacheBust = false } = {}) => {
+  if (!image || typeof image !== 'string') return '';
+  const trimmed = image.trim();
+  if (!trimmed) return '';
+  if (trimmed.startsWith('data:')) return trimmed;
+  if (cacheBust) {
+    const separator = trimmed.includes('?') ? '&' : '?';
+    return `${trimmed}${separator}t=${Date.now()}`;
+  }
+  return trimmed;
+};
+
+const normalizeProductRecord = (product, options = {}) => {
+  if (!product || typeof product !== 'object') return product;
+  const images = Array.isArray(product.images)
+    ? product.images.map((image) => normalizeImageValue(image, options)).filter(Boolean)
+    : [];
+  return { ...product, images };
+};
 
 const DEFAULT_BANNERS = [
   { _id: 'default-1', image: '/hero-image.png', caption: 'Premium Sustainable Engineering Solutions' },
@@ -46,6 +67,68 @@ function App() {
     poster: null
   });
   const [categories, setCategories] = useState([]);
+  const fallbackCategories = ['Stoves'];
+
+  const normalizeCategorySlug = (value) => {
+    if (!value) return '';
+    return value.toString().toLowerCase().trim().replace(/\s+/g, '-');
+  };
+
+  const getCategorySlug = (value) => {
+    if (!value) return '';
+    if (typeof value === 'object') {
+      return normalizeCategorySlug(value.slug || value.name || '');
+    }
+    return normalizeCategorySlug(value);
+  };
+
+  const getCategoryDisplayName = (value) => {
+    if (!value) return '';
+    if (typeof value === 'object') {
+      if (value.name) return value.name.toString();
+      value = value.slug || '';
+    }
+    const raw = value.toString();
+    return raw
+      .split(/[-\s]+/)
+      .filter(Boolean)
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
+  };
+
+  const baseCategories = Array.isArray(categories) && categories.length > 0
+    ? categories.map(cat => ({ name: getCategoryDisplayName(cat), slug: getCategorySlug(cat) }))
+    : fallbackCategories.map(name => ({ name, slug: getCategorySlug(name) }));
+
+  const hiddenCategorySlugs = [
+    'engraining-products',
+    'home-appliances',
+    'welding-products'
+  ];
+
+  const allowedCategorySlugs = ['stoves'];
+  const productCategorySlugs = Array.from(new Set(
+    products
+      .map(p => getCategorySlug(p.category))
+      .filter(Boolean)
+      .filter(slug => !hiddenCategorySlugs.includes(slug))
+  ));
+
+  const productCategories = productCategorySlugs.map(slug => ({
+    name: getCategoryDisplayName(slug),
+    slug
+  }));
+
+  const categoryItems = [...baseCategories, ...productCategories]
+    .filter(item => item && item.slug && !hiddenCategorySlugs.includes(item.slug))
+    .reduce((acc, item) => {
+      if (!item || !item.slug) return acc;
+      if (!acc.some(existing => existing.slug === item.slug)) {
+        acc.push(item);
+      }
+      return acc;
+    }, []);
+
   const [orders, setOrders] = useState([]);
   const [coupons, setCoupons] = useState([]);
   const [supportQueries, setSupportQueries] = useState([]);
@@ -65,14 +148,52 @@ function App() {
   // User Auth State
   const [authMode, setAuthMode] = useState('login'); // 'login', 'signup', or 'verify-otp'
   const [isUserLoggedIn, setIsUserLoggedIn] = useState(false);
-  const [userCredentials, setUserCredentials] = useState({ name: '', email: '', password: '', confirmPassword: '' });
+  const [userCredentials, setUserCredentials] = useState({ name: '', phone: '', address: '', email: '', password: '', confirmPassword: '' });
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [authSubmitting, setAuthSubmitting] = useState(false);
   const [otpCode, setOtpCode] = useState('');
   const [activeUser, setActiveUser] = useState(null);
   const [authPortalIsGate, setAuthPortalIsGate] = useState(false); // true = portal is mandatory gate on /
 
   // Suggestions search state
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const searchContainerRef = useRef(null);
+
+  const filterProductsForDisplay = (sourceProducts = products, query = '', category = selectedCategory) => {
+    const selectedCatClean = getCategorySlug(category);
+
+    return sourceProducts.filter(product => {
+      const productCategorySlug = getCategorySlug(product.category);
+      const matchesCategory = selectedCatClean === 'all' || productCategorySlug === selectedCatClean;
+
+      if (!matchesCategory) return false;
+
+      const normalizedQuery = query.trim().toLowerCase();
+      if (!normalizedQuery) return true;
+
+      const searchableText = [
+        product.name,
+        product.description,
+        product.category,
+        getCategoryDisplayName(product.category),
+        productCategorySlug,
+        product.brand,
+        product.shortName,
+        product.model
+      ].filter(Boolean).join(' ').toLowerCase();
+
+      return searchableText.includes(normalizedQuery);
+    });
+  };
+
+  // Payment/Checkout State
+  const [showCheckout, setShowCheckout] = useState(false);
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [paymentOrder, setPaymentOrder] = useState(null);
+  const [checkoutItems, setCheckoutItems] = useState([]);
+  const [checkoutMode, setCheckoutMode] = useState('cart');
 
   // Click outside suggestions dropdown detector
   useEffect(() => {
@@ -111,16 +232,76 @@ function App() {
     setTimeout(() => setToastMessage(null), 3000);
   };
 
-  // Sync cart & waitlist from DB when user logs in
+  const persistAuthSession = (token, user) => {
+    if (token) {
+      localStorage.setItem('sriTechToken', token);
+    }
+    if (user) {
+      localStorage.setItem('sriTechUser', JSON.stringify(user));
+    }
+  };
+
+  const clearAuthSession = () => {
+    localStorage.removeItem('sriTechToken');
+    localStorage.removeItem('sriTechUser');
+  };
+
+  const loadGuestCart = () => {
+    try {
+      const stored = localStorage.getItem('sriTechCart');
+      return stored ? JSON.parse(stored) : [];
+    } catch (err) {
+      return [];
+    }
+  };
+
+  const loadGuestWaitlist = () => {
+    try {
+      const stored = localStorage.getItem('sriTechWaitlist');
+      return stored ? JSON.parse(stored) : [];
+    } catch (err) {
+      return [];
+    }
+  };
+
+  const saveGuestCart = (items) => {
+    try {
+      localStorage.setItem('sriTechCart', JSON.stringify(items));
+    } catch (err) {
+      console.error('Unable to save guest cart:', err);
+    }
+  };
+
+  const saveGuestWaitlist = (items) => {
+    try {
+      localStorage.setItem('sriTechWaitlist', JSON.stringify(items));
+    } catch (err) {
+      console.error('Unable to save guest wishlist:', err);
+    }
+  };
+
+  // Sync cart & waitlist from DB when user logs in, otherwise load guest local data.
   useEffect(() => {
     if (activeUser) {
       setCart(activeUser.cart || []);
       setWaitlist(activeUser.waitlist || []);
     } else {
-      setCart([]);
-      setWaitlist([]);
+      setCart(loadGuestCart());
+      setWaitlist(loadGuestWaitlist());
     }
   }, [activeUser]);
+
+  useEffect(() => {
+    if (!activeUser) {
+      saveGuestCart(cart);
+    }
+  }, [cart, activeUser]);
+
+  useEffect(() => {
+    if (!activeUser) {
+      saveGuestWaitlist(waitlist);
+    }
+  }, [waitlist, activeUser]);
 
   useEffect(() => {
     if (activeUser) {
@@ -142,7 +323,7 @@ function App() {
   // Scroll Spy for Navigation
   useEffect(() => {
     const handleScroll = () => {
-      const sections = ['home', 'product', 'new-arrival'];
+      const sections = ['home', 'product'];
       let current = 'home';
       sections.forEach(section => {
         const element = document.getElementById(section);
@@ -178,26 +359,39 @@ function App() {
   // Fetch Initial Data
   const fetchData = async () => {
     const t = Date.now();
+    let productsLoaded = false;
 
     // Fetch products
     try {
       const prodRes = await fetch(`${API_URL}/products?t=${t}`);
       if (prodRes.ok) {
         const prodData = await prodRes.json();
-        setProducts(prodData);
+        if (Array.isArray(prodData)) {
+          setProducts(prodData.map((product) => normalizeProductRecord(product)));
+          productsLoaded = true;
+        } else {
+          setProducts([]);
+          showToast('Unexpected product response from backend.', 'error');
+        }
+      } else {
+        setProducts([]);
+        showToast('Backend error loading products.', 'error');
       }
     } catch (err) {
       console.error("Error fetching products:", err);
-      // Fetch categories
-      try {
-        const catRes = await fetch(`${API_URL}/categories?t=${t}`);
-        if (catRes.ok) {
-          const catData = await catRes.json();
-          setCategories(catData); // store full objects with _id, name, slug
-        }
-      } catch (err) {
-        console.error("Error fetching categories:", err);
+      setProducts([]);
+      showToast('Backend unavailable. Please try again later.', 'error');
+    }
+
+    // Fetch categories
+    try {
+      const catRes = await fetch(`${API_URL}/categories?t=${t}`);
+      if (catRes.ok) {
+        const catData = await catRes.json();
+        setCategories(catData); // store full objects with _id, name, slug
       }
+    } catch (err) {
+      console.error("Error fetching categories:", err);
     }
 
     // Fetch offers
@@ -288,9 +482,9 @@ function App() {
     if (isAdminPath) {
       setShowAdminLogin(true);
     } else {
-      // Show user login portal immediately as a gate on the main site
-      setShowAuthModal(true);
-      setAuthPortalIsGate(true);
+       // Show user login portal immediately as a gate on the main site (disabled)
+       // setShowAuthModal(true);
+       // setAuthPortalIsGate(true);
     }
 
     fetchData();
@@ -299,6 +493,7 @@ function App() {
   // Fetch reviews when product is selected
   useEffect(() => {
     if (selectedProduct) {
+      setSelectedProductImageIndex(0);
       const fetchReviews = async () => {
         try {
           const res = await fetch(`${API_URL}/products/${selectedProduct._id || selectedProduct.id}/reviews?t=${Date.now()}`);
@@ -315,22 +510,11 @@ function App() {
     }
   }, [selectedProduct]);
 
-  const handleRefresh = async () => {
+  const handleRefresh = () => {
     setIsRefreshing(true);
-    await fetchData();
-    if (selectedProduct) {
-      try {
-        const res = await fetch(`${API_URL}/products/${selectedProduct._id || selectedProduct.id}/reviews?t=${Date.now()}`);
-        if (res.ok) {
-          setSelectedProductReviews(await res.json());
-        }
-      } catch (err) {
-        console.error("Error fetching reviews:", err);
-      }
-    }
     setTimeout(() => {
-      setIsRefreshing(false);
-    }, 800);
+      window.location.reload();
+    }, 100);
   };
 
   const handleSubmitReview = async (e) => {
@@ -415,10 +599,17 @@ function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newProduct)
       });
-      const savedProduct = await res.json();
-      setProducts([savedProduct, ...products]);
+      if (res.ok) {
+        const savedProduct = await res.json();
+        setProducts(prev => [savedProduct, ...prev]);
+        showToast('Product added successfully!', 'success');
+      } else {
+        const error = await res.json();
+        showToast(error.message || 'Failed to add product.', 'error');
+      }
     } catch (err) {
       console.error("Error adding product:", err);
+      showToast('Error adding product. Please try again.', 'error');
     }
   };
 
@@ -430,14 +621,17 @@ function App() {
       });
       if (res.ok) {
         setProducts(prev => prev.filter(p => (p._id || p.id) !== productId));
+        setSelectedProduct(prev => (prev && (prev._id || prev.id) === productId ? null : prev));
         showToast('Product deleted successfully!', 'success');
         const logRes = await fetch(`${API_URL}/logs`);
         setActivityLogs(await logRes.json());
       } else {
-        showToast('Failed to delete product.', 'error');
+        const error = await res.json();
+        showToast(error.message || 'Failed to delete product.', 'error');
       }
     } catch (err) {
       console.error("Error deleting product:", err);
+      showToast('Error deleting product. Please try again.', 'error');
     }
   };
 
@@ -449,8 +643,12 @@ function App() {
         body: JSON.stringify(updatedData)
       });
       if (res.ok) {
-        const updated = await res.json();
+        const updatedPayload = await res.json();
+        const updated = normalizeProductRecord(updatedPayload, { cacheBust: true });
         setProducts(prev => prev.map(p => (p._id || p.id) === productId ? updated : p));
+        setSelectedProduct(prev => (
+          prev && (prev._id || prev.id) === productId ? updated : prev
+        ));
         showToast('Product updated successfully!', 'success');
         const logRes = await fetch(`${API_URL}/logs`);
         setActivityLogs(await logRes.json());
@@ -499,6 +697,78 @@ function App() {
     } catch (err) {
       console.error("Error adding coupon:", err);
       showToast('Connection error.', 'error');
+    }
+  };
+
+  const addCategory = async (categorySlug) => {
+    try {
+      const formattedName = categorySlug
+        .split('-')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ');
+      const res = await fetch(`${API_URL}/categories`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: formattedName, slug: categorySlug })
+      });
+      if (res.ok) {
+        const savedCategory = await res.json();
+        setCategories(prev => [savedCategory, ...prev]);
+        showToast('Category added successfully!', 'success');
+        const logRes = await fetch(`${API_URL}/logs`);
+        if (logRes.ok) setActivityLogs(await logRes.json());
+      } else {
+        const err = await res.json();
+        showToast(err.message || 'Failed to add category.', 'error');
+      }
+    } catch (err) {
+      console.error('Error adding category:', err);
+      showToast('Error adding category.', 'error');
+    }
+  };
+
+  const updateCategory = async (categoryId, newName) => {
+    try {
+      const newSlug = newName.toLowerCase().trim().replace(/\s+/g, '-');
+      const res = await fetch(`${API_URL}/categories/${categoryId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newName, slug: newSlug })
+      });
+      if (res.ok) {
+        const updatedCategory = await res.json();
+        setCategories(prev => prev.map(cat => (cat._id || cat.id) === categoryId ? updatedCategory : cat));
+        showToast('Category updated successfully!', 'success');
+        const logRes = await fetch(`${API_URL}/logs`);
+        if (logRes.ok) setActivityLogs(await logRes.json());
+      } else {
+        const err = await res.json();
+        showToast(err.message || 'Failed to update category.', 'error');
+      }
+    } catch (err) {
+      console.error('Error updating category:', err);
+      showToast('Error updating category.', 'error');
+    }
+  };
+
+  const deleteCategory = async (categoryId) => {
+    if (!window.confirm('Are you sure you want to delete this category?')) return;
+    try {
+      const res = await fetch(`${API_URL}/categories/${categoryId}`, {
+        method: 'DELETE'
+      });
+      if (res.ok) {
+        setCategories(prev => prev.filter(cat => (cat._id || cat.id) !== categoryId));
+        showToast('Category deleted successfully!', 'success');
+        const logRes = await fetch(`${API_URL}/logs`);
+        if (logRes.ok) setActivityLogs(await logRes.json());
+      } else {
+        const err = await res.json();
+        showToast(err.message || 'Failed to delete category.', 'error');
+      }
+    } catch (err) {
+      console.error('Error deleting category:', err);
+      showToast('Error deleting category.', 'error');
     }
   };
 
@@ -669,13 +939,27 @@ function App() {
     setTimeout(() => setShowOfferModal(true), 500);
   };
   const handleAddToCart = async (product) => {
+    const productId = product._id || product.id;
+
+    const addCartLocally = () => {
+      setCart(prev => {
+        const alreadyInCart = prev.some(item => (item._id || item.id) === productId);
+        if (alreadyInCart) {
+          showToast(`${product.name} is already in your cart.`, 'info');
+          return prev;
+        }
+        const updated = [...prev, product];
+        saveGuestCart(updated);
+        showToast(`✅ ${product.name} added to cart!`, 'success');
+        return updated;
+      });
+    };
+
     if (!isUserLoggedIn) {
-      showToast('Please login to add items to cart.', 'error');
-      setAuthMode('login');
-      setShowAuthModal(true);
+      addCartLocally();
       return;
     }
-    const productId = product._id || product.id;
+
     try {
       const res = await fetch(`${API_URL}/users/${activeUser._id}/cart`, {
         method: 'POST',
@@ -683,7 +967,10 @@ function App() {
         body: JSON.stringify({ productId })
       });
       if (res.ok) {
-        setCart(prev => [...prev, product]);
+        setCart(prev => {
+          const alreadyInCart = prev.some(item => (item._id || item.id) === productId);
+          return alreadyInCart ? prev : [...prev, product];
+        });
         showToast(`✅ ${product.name} added to cart!`, 'success');
       } else {
         showToast('Failed to add to cart.', 'error');
@@ -715,62 +1002,194 @@ function App() {
   const handleCheckoutCart = async () => {
     if (!isUserLoggedIn) {
       showToast('Please login to place an order.', 'error');
-      setAuthMode('login');
-      setShowAuthModal(true);
       return;
     }
     if (resolvedCartItems.length === 0) {
       showToast('Your cart is empty.', 'error');
       return;
     }
-    const confirmOrder = window.confirm(`Confirm purchase of ${resolvedCartItems.length} items totaling ₹${cartTotal}?`);
-    if (!confirmOrder) return;
+    setCheckoutMode('cart');
+    setCheckoutItems(resolvedCartItems);
+    setShowCheckout(true);
+  };
 
-    const orderItems = resolvedCartItems.map(p => ({ product: p._id || p.id, quantity: 1, price: getProductFinalPrice(p) }));
-    const totalAmount = cartTotal;
+  // Initiate Razorpay payment
+  const handleInitiatePayment = async () => {
+    const itemsForCheckout = checkoutItems.length > 0 ? checkoutItems : resolvedCartItems;
+    const totalForCheckout = itemsForCheckout.reduce((sum, item) => sum + getProductFinalPrice(item), 0);
 
-    const orderData = {
-      customerName: activeUser.name,
-      email: activeUser.email,
-      items: orderItems,
-      totalAmount,
-    };
+    if (!itemsForCheckout || itemsForCheckout.length === 0) {
+      showToast('Your cart is empty.', 'error');
+      return;
+    }
 
+    setIsProcessingPayment(true);
     try {
-      const res = await fetch(`${API_URL}/orders`, {
+      // Step 1: Create Razorpay order
+      const orderRes = await fetch(`${API_URL}/payments/create-order`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amount: totalForCheckout,
+          currency: 'INR',
+          receipt: `order_${Date.now()}`
+        })
+      });
+
+      if (!orderRes.ok) {
+        const errorData = await orderRes.json();
+        showToast(errorData.message || 'Failed to create payment order.', 'error');
+        setIsProcessingPayment(false);
+        return;
+      }
+
+      const razorpayOrder = await orderRes.json();
+      setPaymentOrder(razorpayOrder);
+
+      // Step 2: Get Razorpay key from backend or use hardcoded
+      const keyRes = await fetch(`${API_URL}/payments/get-key`).catch(() => null);
+      const razorpayKey = keyRes ? (await keyRes.json()).key : process.env.VITE_RAZORPAY_KEY_ID;
+
+      if (!razorpayKey) {
+        showToast('Razorpay key not configured. Please contact support.', 'error');
+        setIsProcessingPayment(false);
+        return;
+      }
+
+      // Step 3: Open Razorpay checkout
+      const options = {
+        key: razorpayKey,
+        amount: razorpayOrder.amount,
+        currency: 'INR',
+        name: 'SriTech',
+        description: 'Product Purchase',
+        order_id: razorpayOrder.id,
+        handler: async (response) => {
+          console.log(response);
+          await handleVerifyPayment(response);
+        },
+        prefill: {
+          name: activeUser?.name || '',
+          email: activeUser?.email || '',
+          contact: activeUser?.phone || ''
+        },
+        theme: {
+          color: '#1E7A3B'
+        },
+        modal: {
+          ondismiss: () => {
+            setIsProcessingPayment(false);
+            showToast('Payment cancelled.', 'info');
+          }
+        }
+      };
+
+      if (window.Razorpay) {
+        const payment = new window.Razorpay(options);
+        payment.open();
+      } else {
+        showToast('Razorpay not loaded. Please refresh and try again.', 'error');
+        setIsProcessingPayment(false);
+      }
+    } catch (err) {
+      console.error('Payment initiation error:', err);
+      showToast('Error initiating payment. Please try again.', 'error');
+      setIsProcessingPayment(false);
+    }
+  };
+
+  // Verify payment and create order
+  const handleVerifyPayment = async (paymentResponse) => {
+    try {
+      // Verify payment signature with backend
+      const verifyRes = await fetch(`${API_URL}/payments/verify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          razorpay_order_id: paymentResponse.razorpay_order_id,
+          razorpay_payment_id: paymentResponse.razorpay_payment_id,
+          razorpay_signature: paymentResponse.razorpay_signature
+        })
+      });
+
+      if (!verifyRes.ok) {
+        showToast('Payment verification failed. Please contact support.', 'error');
+        setIsProcessingPayment(false);
+        return;
+      }
+
+      // Payment verified - now create the order
+      const itemsForCheckout = checkoutItems.length > 0 ? checkoutItems : resolvedCartItems;
+      const orderItems = itemsForCheckout.map(p => ({ 
+        product: p._id || p.id, 
+        quantity: 1, 
+        price: getProductFinalPrice(p) 
+      }));
+      const totalForCheckout = itemsForCheckout.reduce((sum, item) => sum + getProductFinalPrice(item), 0);
+
+      const orderData = {
+        customerName: activeUser.name,
+        email: activeUser.email,
+        items: orderItems,
+        totalAmount: String(totalForCheckout),
+        paymentId: paymentResponse.razorpay_payment_id,
+        paymentStatus: 'completed',
+        paymentOrderId: paymentResponse.razorpay_order_id,
+        paymentSignature: paymentResponse.razorpay_signature,
+        status: 'Processing'
+      };
+
+      const createOrderRes = await fetch(`${API_URL}/orders`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(orderData)
       });
-      if (res.ok) {
-        const order = await res.json();
-        
-        // Clear backend cart as well
-        try {
-          await fetch(`${API_URL}/users/${activeUser._id}/cart`, {
-            method: 'DELETE'
-          });
-        } catch (err) {
-          console.error("Error clearing cart on backend:", err);
+
+      if (createOrderRes.ok) {
+        const order = await createOrderRes.json();
+
+        if (checkoutMode === 'cart') {
+          try {
+            await fetch(`${API_URL}/users/${activeUser._id}/cart`, {
+              method: 'DELETE'
+            });
+          } catch (err) {
+            console.error("Error clearing cart on backend:", err);
+          }
+          setCart([]);
         }
 
-        showToast(`🎉 Success! Order #${order.orderId} placed. Confirmation email sent to ${activeUser.email}`, 'success');
-        setCart([]); // clear local cart
+        showToast(`🎉 Payment successful! Order #${order.orderId} placed. Confirmation email sent to ${activeUser.email}`, 'success');
         setShowCart(false);
+        setShowCheckout(false);
+        setPaymentOrder(null);
+        setCheckoutItems([]);
+        setCheckoutMode('cart');
       } else {
-        showToast('Failed to place order. Please try again.', 'error');
+        showToast('Failed to create order after payment. Please contact support.', 'error');
       }
     } catch (err) {
-      console.error('Order error:', err);
-      showToast('Error connecting to server.', 'error');
+      console.error('Payment verification error:', err);
+      showToast('Error verifying payment. Please contact support.', 'error');
+    } finally {
+      setIsProcessingPayment(false);
     }
   };
 
+
   const handleToggleWaitlist = async (productId) => {
+    const toggleWishlistLocally = () => {
+      setWaitlist(prev => {
+        const isPresent = prev.includes(productId);
+        const updated = isPresent ? prev.filter(id => id !== productId) : [...prev, productId];
+        saveGuestWaitlist(updated);
+        showToast(isPresent ? '💔 Removed from wishlist.' : '❤️ Added to wishlist!', 'success');
+        return updated;
+      });
+    };
+
     if (!isUserLoggedIn) {
-      showToast('Please login to save to wishlist.', 'error');
-      setAuthMode('login');
-      setShowAuthModal(true);
+      toggleWishlistLocally();
       return;
     }
     try {
@@ -795,7 +1214,8 @@ function App() {
 
   const handleBuyNow = async (product) => {
     if (!isUserLoggedIn) {
-      showToast('Please login or sign up to place an order.', 'error');
+      // Redirect user to sign-in/signup modal when they try to buy while unauthenticated
+      setSelectedProduct(product);
       setAuthMode('login');
       setShowAuthModal(true);
       return;
@@ -804,36 +1224,17 @@ function App() {
     const confirmOrder = window.confirm(`Confirm purchase for ${product.name} at ₹${getProductFinalPrice(product)}?`);
     if (!confirmOrder) return;
 
-    try {
-      const orderData = {
-        customerName: activeUser.name,
-        email: activeUser.email,
-        items: [{ product: product._id, quantity: 1, price: product.price }],
-        totalAmount: product.price
-      };
-
-      const res = await fetch(`${API_URL}/orders`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(orderData)
-      });
-
-      if (res.ok) {
-        const order = await res.json();
-        showToast(`🎉 Success! Order #${order.orderId} placed. Confirmation email sent to ${activeUser.email}`, 'success');
-      } else {
-        showToast('Failed to place order. Please try again.', 'error');
-      }
-    } catch (err) {
-      console.error("Order error:", err);
-      showToast('Error connecting to server.', 'error');
-    }
+    setCheckoutMode('buy-now');
+    setCheckoutItems([product]);
+    setShowCheckout(true);
+    showToast('Secure checkout is ready. Complete payment to place your order.', 'success');
   };
 
 
   const handleCategoryChange = (cat) => {
-    setSelectedCategory(cat);
-    setSearchTerm(""); // Clear search when category changes
+    const nextCategory = getCategorySlug(cat);
+    setSelectedCategory(nextCategory);
+    setSearchTerm("");
   };
 
   const handleAdminLoginSubmit = async (e) => {
@@ -864,18 +1265,42 @@ function App() {
     }
   };
 
+  const updateUserCredentials = (field, value) => {
+    setUserCredentials(prev => ({ ...prev, [field]: value }));
+  };
+
   const handleUserAuthSubmit = async (e) => {
     e.preventDefault();
+    setAuthSubmitting(true);
+
+    const currentValues = {
+      name: userCredentials.name,
+      phone: userCredentials.phone,
+      address: userCredentials.address,
+      email: userCredentials.email,
+      password: userCredentials.password,
+      confirmPassword: userCredentials.confirmPassword
+    };
+
+    const normalizedEmail = (currentValues.email || '').trim().toLowerCase();
+    const normalizedOtp = (otpCode || '').trim();
+
     try {
       if (authMode === 'signup') {
-        if (userCredentials.password !== userCredentials.confirmPassword) {
+        if (currentValues.password !== currentValues.confirmPassword) {
           showToast('Passwords do not match!', 'error');
           return;
         }
-        const res = await fetch(`${API_URL}/users/signup`, {
+        const res = await fetch(`${API_URL}/auth/signup`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: userCredentials.name, email: userCredentials.email, password: userCredentials.password })
+          body: JSON.stringify({
+            name: currentValues.name,
+            phone: currentValues.phone,
+            address: currentValues.address,
+            email: normalizedEmail,
+            password: currentValues.password
+          })
         });
         if (res.ok) {
           setAuthMode('verify-otp');
@@ -885,33 +1310,51 @@ function App() {
           showToast(error.message || 'Signup failed', 'error');
         }
       } else if (authMode === 'verify-otp') {
-        const res = await fetch(`${API_URL}/users/verify-otp`, {
+        const res = await fetch(`${API_URL}/auth/verify-otp`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: userCredentials.email, otp: otpCode })
+          body: JSON.stringify({ email: normalizedEmail, otp: normalizedOtp })
         });
         if (res.ok) {
           const data = await res.json();
-          setActiveUser(data);
+          const user = data.user || data;
+          const token = data.token;
+          setActiveUser(user);
           setIsUserLoggedIn(true);
+          persistAuthSession(token, user);
           setShowAuthModal(false);
-          showToast(`Welcome, ${data.name}!`, 'success');
+          showToast('✅ Verification complete. Login successful!', 'success');
         } else {
           const error = await res.json();
           showToast(error.message || 'OTP verification failed', 'error');
         }
       } else {
-        const res = await fetch(`${API_URL}/users/login`, {
+        // Intercept admin credentials to log into the Admin Dashboard
+        const adminUsername = 'thesmgroups@gmail.com';
+        const adminPassword = 'TSMGPVT@2026';
+        if (currentValues.email === adminUsername && currentValues.password === adminPassword) {
+          setIsAdmin(true);
+          setShowAuthModal(false);
+          setUserCredentials({ name: '', email: '', password: '', confirmPassword: '' });
+          fetchData();
+          showToast('Admin authenticated successfully!', 'success');
+          return;
+        }
+
+        const res = await fetch(`${API_URL}/auth/login`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: userCredentials.email, password: userCredentials.password })
+          body: JSON.stringify({ email: normalizedEmail, password: currentValues.password })
         });
         if (res.ok) {
           const data = await res.json();
-          setActiveUser(data);
+          const user = data.user || data;
+          const token = data.token;
+          setActiveUser(user);
           setIsUserLoggedIn(true);
+          persistAuthSession(token, user);
           setShowAuthModal(false);
-          showToast('Logged in successfully!', 'success');
+          showToast('✅ Login successful!', 'success');
         } else {
           const error = await res.json();
           showToast(error.message || 'Authentication failed', 'error');
@@ -920,20 +1363,29 @@ function App() {
     } catch (err) {
       console.error("Auth error:", err);
       showToast('Authentication error. Please try again.', 'error');
+    } finally {
+      setAuthSubmitting(false);
     }
-    if (authMode !== 'signup') {
-      setUserCredentials({ name: '', email: '', password: '', confirmPassword: '' });
+
+    // IMPORTANT: Do NOT clear password fields after signup submission.
+    // Clearing them makes the form look like it reset unexpectedly while the OTP step is loading.
+    if (authMode === 'login') {
+      setUserCredentials({ name: '', phone: '', address: '', email: '', password: '', confirmPassword: '' });
+      setOtpCode('');
+    }
+    if (authMode === 'signup') {
       setOtpCode('');
     }
   };
 
   const handleLogout = () => {
+    clearAuthSession();
     setIsUserLoggedIn(false);
     setActiveUser(null);
     setAuthMode('login');
-    setUserCredentials({ name: '', email: '', password: '', confirmPassword: '' });
+    setUserCredentials({ name: '', phone: '', address: '', email: '', password: '', confirmPassword: '' });
     setOtpCode('');
-    setShowAuthModal(true);
+    setShowAuthModal(false);
     setAuthPortalIsGate(true);
   };
 
@@ -955,6 +1407,8 @@ function App() {
         onAddCoupon={addCoupon}
         onDeleteCoupon={deleteCoupon}
         onUpdateCoupon={updateCoupon}
+        onUpdateCategory={updateCategory}
+        onDeleteCategory={deleteCategory}
         orders={orders}
         coupons={coupons}
         supportQueries={supportQueries}
@@ -1010,12 +1464,25 @@ function App() {
   }).filter(Boolean);
 
   const cartTotal = resolvedCartItems.reduce((sum, item) => sum + getProductFinalPrice(item), 0);
+  const checkoutItemsForDisplay = checkoutItems.length > 0 ? checkoutItems : resolvedCartItems;
+  const checkoutTotal = checkoutItemsForDisplay.reduce((sum, item) => sum + getProductFinalPrice(item), 0);
 
-  const matchedSuggestions = searchTerm.trim() === "" ? [] : products.filter(product => {
-    const productCategory = product.category ? product.category.toLowerCase().trim() : '';
-    const nameMatch = (product.name || '').toLowerCase().includes(searchTerm.toLowerCase());
-    const categoryMatch = productCategory.includes(searchTerm.toLowerCase());
-    return nameMatch || categoryMatch;
+  const normalizedSearchTerm = searchTerm.trim().toLowerCase();
+
+  const matchedSuggestions = normalizedSearchTerm === "" ? [] : products.filter(product => {
+    const productCategorySlug = getCategorySlug(product.category);
+    const searchableText = [
+      product.name,
+      product.description,
+      product.category,
+      getCategoryDisplayName(product.category),
+      productCategorySlug,
+      product.brand,
+      product.shortName,
+      product.model
+    ].filter(Boolean).join(' ').toLowerCase();
+
+    return searchableText.includes(normalizedSearchTerm);
   });
 
   const handleSuggestionClick = (product) => {
@@ -1027,13 +1494,15 @@ function App() {
   const handleResendOtp = async () => {
     if (resendTimer > 0) return;
     try {
-      const res = await fetch(`${API_URL}/users/signup`, {
+      const res = await fetch(`${API_URL}/auth/signup`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          name: userCredentials.name || 'User', 
-          email: userCredentials.email, 
-          password: userCredentials.password || 'TemporaryPassword123' 
+          name: userCredentials.name || 'User',
+          phone: userCredentials.phone || '',
+          address: userCredentials.address || '',
+          email: (userCredentials.email || '').trim().toLowerCase(),
+          password: userCredentials.password || 'TemporaryPassword123'
         })
       });
       if (res.ok) {
@@ -1048,19 +1517,9 @@ function App() {
     }
   };
 
-  const filteredProducts = products.filter(product => {
-    const productCategory = product.category ? product.category.toLowerCase().trim() : '';
-    const selectedCatClean = selectedCategory ? selectedCategory.toLowerCase().trim() : '';
-    const productCategorySlug = productCategory.replace(/\s+/g, '-');
-    
-    const matchesCategory = selectedCatClean === 'all' || 
-                            productCategory === selectedCatClean || 
-                            productCategorySlug === selectedCatClean;
-                            
-    const matchesSearch = (product.name || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          productCategory.includes(searchTerm.toLowerCase());
-    return matchesCategory && matchesSearch;
-  });
+  const filteredProducts = useMemo(() => {
+    return filterProductsForDisplay(products, searchTerm, selectedCategory);
+  }, [products, searchTerm, selectedCategory]);
 
   const scrollToSection = (e, sectionId) => {
     e.preventDefault();
@@ -1091,7 +1550,7 @@ function App() {
               <div className="product-slider">
                 <div className="slider-main-image">
                   {selectedProduct.images && selectedProduct.images.length > 0 ? (
-                    <img 
+                    <img loading="lazy" 
                       src={selectedProduct.images[selectedProductImageIndex]} 
                       alt={selectedProduct.name} 
                     />
@@ -1128,7 +1587,7 @@ function App() {
                         className={`thumbnail-btn ${selectedProductImageIndex === idx ? 'active' : ''}`}
                         onClick={() => setSelectedProductImageIndex(idx)}
                       >
-                        <img src={img} alt={`Thumbnail ${idx + 1}`} />
+                        <img loading="lazy" src={img} alt={`Thumbnail ${idx + 1}`} />
                       </button>
                     ))}
                   </div>
@@ -1176,8 +1635,13 @@ function App() {
                     return selectedProduct.price.toString().startsWith('₹') ? selectedProduct.price : `₹${selectedProduct.price}`;
                   })()}
                 </div>
+                {typeof selectedProduct.stock === 'number' && (
+                  <div className="stock-info" style={{ marginBottom: '1rem', fontWeight: 600, color: selectedProduct.stock > 0 ? '#15803d' : '#b91c1c' }}>
+                    {selectedProduct.stock > 0 ? `In stock: ${selectedProduct.stock}` : 'Out of stock'}
+                  </div>
+                )}
                 <p className="description-text">
-                  Experience top-tier quality and premium design with our {selectedProduct.name}. Crafted carefully to blend cutting-edge performance with eco-friendly efficiency. Contact support or use our active coupon codes for additional seasonal discounts.
+                  {selectedProduct.description || `Experience top-tier quality and premium design with our ${selectedProduct.name}. Crafted carefully to blend cutting-edge performance with eco-friendly efficiency.`}
                 </p>
                 <div className="actions-row">
                   <button className="buy-now-btn" onClick={() => { setSelectedProduct(null); handleBuyNow(selectedProduct); }}>Buy Now</button>
@@ -1217,51 +1681,38 @@ function App() {
 
                 {/* Submit Review Form (Only for buyers) */}
                 <div className="review-form-container" style={{ textAlign: 'left' }}>
-                  {isUserLoggedIn && orders.some(order => order.customerName === activeUser.name && order.items.some(item => (item.product._id || item.product) === selectedProduct._id)) ? (
-                    <form onSubmit={handleSubmitReview} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                      <h4 style={{ color: 'var(--primary-color)', margin: '0' }}>Share Your Experience</h4>
-                      <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: '0' }}>As a verified purchaser, you can rate this product below.</p>
-                      
-                      <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                        <label style={{ fontSize: '0.9rem', fontWeight: 'bold', color: 'var(--primary-color)' }}>Your Rating</label>
-                        <div style={{ display: 'flex', gap: '0.5rem', fontSize: '1.5rem', color: '#fbbf24', cursor: 'pointer' }}>
-                          {[1, 2, 3, 4, 5].map((star) => (
-                            <i 
-                              key={star} 
-                              className={`${star <= newReviewRating ? 'fa-solid' : 'fa-regular'} fa-star`}
-                              onClick={() => setNewReviewRating(star)}
-                            ></i>
-                          ))}
-                        </div>
+                  <form onSubmit={handleSubmitReview} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                    <h4 style={{ color: 'var(--primary-color)', margin: '0' }}>Share Your Experience</h4>
+                    <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: '0' }}>You can rate this product below.</p>
+                    
+                    <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                      <label style={{ fontSize: '0.9rem', fontWeight: 'bold', color: 'var(--primary-color)' }}>Your Rating</label>
+                      <div style={{ display: 'flex', gap: '0.5rem', fontSize: '1.5rem', color: '#fbbf24', cursor: 'pointer' }}>
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <i 
+                            key={star} 
+                            className={`${star <= newReviewRating ? 'fa-solid' : 'fa-regular'} fa-star`}
+                            onClick={() => setNewReviewRating(star)}
+                          ></i>
+                        ))}
                       </div>
-
-                      <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                        <label htmlFor="reviewComment" style={{ fontSize: '0.9rem', fontWeight: 'bold', color: 'var(--primary-color)' }}>Your Review</label>
-                        <textarea 
-                          id="reviewComment"
-                          rows="4" 
-                          placeholder="What did you think of the product? Share your experience with others..." 
-                          required
-                          value={newReviewComment}
-                          onChange={(e) => setNewReviewComment(e.target.value)}
-                          style={{ padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)', width: '100%', fontFamily: 'inherit', resize: 'vertical' }}
-                        ></textarea>
-                      </div>
-
-                      <button type="submit" className="buy-now-btn" style={{ width: '100%', padding: '0.75rem' }}>Submit Review</button>
-                    </form>
-                  ) : (
-                    <div style={{ background: 'var(--bg-secondary)', padding: '1.5rem', borderRadius: '12px', border: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', minHeight: '200px', color: 'var(--text-muted)', textAlign: 'center' }}>
-                      <i className="fa-solid fa-circle-info" style={{ fontSize: '2rem', color: 'var(--primary-light)', marginBottom: '0.75rem' }}></i>
-                      <p style={{ margin: '0 0 0.5rem 0', fontWeight: 'bold', color: 'var(--primary-color)' }}>Review Option Locked</p>
-                      <p style={{ margin: '0', fontSize: '0.85rem' }}>
-                        {isUserLoggedIn 
-                          ? "Only verified purchasers of this product can submit a review." 
-                          : "Please login and purchase this product to write a review."
-                        }
-                      </p>
                     </div>
-                  )}
+
+                    <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                      <label htmlFor="reviewComment" style={{ fontSize: '0.9rem', fontWeight: 'bold', color: 'var(--primary-color)' }}>Your Review</label>
+                      <textarea 
+                        id="reviewComment"
+                        rows="4" 
+                        placeholder="What did you think of the product? Share your experience with others..." 
+                        required
+                        value={newReviewComment}
+                        onChange={(e) => setNewReviewComment(e.target.value)}
+                        style={{ padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-color)', width: '100%', fontFamily: 'inherit', resize: 'vertical' }}
+                      ></textarea>
+                    </div>
+
+                    <button type="submit" className="buy-now-btn" style={{ width: '100%', padding: '0.75rem' }}>Submit Review</button>
+                  </form>
                 </div>
               </div>
             </div>
@@ -1284,7 +1735,7 @@ function App() {
                     >
                       <div className="related-product-img">
                         {relatedProduct.images && relatedProduct.images.length > 0 ? (
-                          <img src={relatedProduct.images[0]} alt={relatedProduct.name} />
+                          <img loading="lazy" src={relatedProduct.images[0]} alt={relatedProduct.name} />
                         ) : (
                           <i className={`fa-solid ${relatedProduct.icon || 'fa-box'}`} style={{ fontSize: '2rem', color: 'var(--primary-color)' }}></i>
                         )}
@@ -1327,7 +1778,7 @@ function App() {
                      <li key={idx} className="modal-item-card">
                        <div className="modal-item-img">
                          {item.images && item.images.length > 0 ? (
-                           <img src={item.images[0]} alt={item.name} />
+                           <img loading="lazy" src={item.images[0]} alt={item.name} />
                          ) : (
                            <i className={`fa-solid ${item.icon || 'fa-box'}`}></i>
                          )}
@@ -1364,6 +1815,101 @@ function App() {
            </div>
          </div>
        )}
+
+       {/* Checkout Modal */}
+       {showCheckout && (
+         <div id="checkoutModal" className="modal-overlay active" style={{ display: 'flex' }}>
+           <div className="modal-content" role="dialog" aria-modal="true" style={{ maxWidth: '700px', width: '90%' }}>
+             <button className="close-modal" onClick={() => setShowCheckout(false)} aria-label="Close" disabled={isProcessingPayment}>
+               &times;
+             </button>
+             <h2 style={{ fontSize: '1.8rem', color: 'var(--primary-color)', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+               <i className="fa-solid fa-credit-card"></i> Order Checkout
+             </h2>
+
+             {/* Order Summary */}
+             <div style={{ backgroundColor: 'rgba(30, 122, 59, 0.1)', padding: '1rem', borderRadius: '8px', marginBottom: '1.5rem', border: '1px solid var(--accent-color)' }}>
+               <h3 style={{ color: 'var(--accent-color)', marginBottom: '1rem', fontSize: '1.1rem' }}>Order Summary</h3>
+               
+               <div style={{ marginBottom: '1rem' }}>
+                 <h4 style={{ color: 'var(--primary-color)', marginBottom: '0.5rem', fontSize: '0.95rem' }}>Customer Details</h4>
+                 <p style={{ margin: '0.25rem 0', color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+                   <strong>Name:</strong> {activeUser?.name || 'N/A'}
+                 </p>
+                 <p style={{ margin: '0.25rem 0', color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+                   <strong>Email:</strong> {activeUser?.email || 'N/A'}
+                 </p>
+               </div>
+
+               <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1rem', marginBottom: '1rem' }}>
+                 <h4 style={{ color: 'var(--primary-color)', marginBottom: '0.75rem', fontSize: '0.95rem' }}>Items ({checkoutItemsForDisplay.length})</h4>
+                 <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+                   {checkoutItemsForDisplay.map((item, idx) => (
+                     <li key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.5rem 0', borderBottom: '1px solid rgba(30, 122, 59, 0.2)', fontSize: '0.9rem' }}>
+                       <span style={{ color: 'var(--text-main)' }}>{item.name}</span>
+                       <span style={{ color: 'var(--accent-color)', fontWeight: 'bold' }}>₹{getProductFinalPrice(item).toLocaleString('en-IN')}</span>
+                     </li>
+                   ))}
+                 </ul>
+               </div>
+
+               <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                 <span style={{ fontSize: '1.2rem', fontWeight: 'bold', color: 'var(--primary-color)' }}>Total Amount:</span>
+                 <span style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--accent-color)' }}>₹{checkoutTotal.toLocaleString('en-IN')}</span>
+               </div>
+             </div>
+
+             {/* Action Buttons */}
+             <div style={{ display: 'flex', gap: '1rem', flexDirection: 'column' }}>
+               <button 
+                 className="cta-button" 
+                 onClick={handleInitiatePayment}
+                 disabled={isProcessingPayment}
+                 style={{ 
+                   width: '100%', 
+                   padding: '1rem', 
+                   fontSize: '1.1rem',
+                   opacity: isProcessingPayment ? 0.7 : 1,
+                   cursor: isProcessingPayment ? 'not-allowed' : 'pointer',
+                   display: 'flex',
+                   alignItems: 'center',
+                   justifyContent: 'center',
+                   gap: '0.5rem'
+                 }}
+               >
+                 {isProcessingPayment ? (
+                   <>
+                     <i className="fa-solid fa-spinner fa-spin"></i> Processing...
+                   </>
+                 ) : (
+                   <>
+                     <i className="fa-solid fa-lock"></i> Pay Now
+                   </>
+                 )}
+               </button>
+               
+               <button 
+                 onClick={() => setShowCheckout(false)}
+                 disabled={isProcessingPayment}
+                 style={{
+                   width: '100%',
+                   padding: '0.75rem',
+                   fontSize: '1rem',
+                   backgroundColor: 'transparent',
+                   color: 'var(--accent-color)',
+                   border: '2px solid var(--accent-color)',
+                   borderRadius: '8px',
+                   cursor: isProcessingPayment ? 'not-allowed' : 'pointer',
+                   opacity: isProcessingPayment ? 0.7 : 1,
+                   fontWeight: '600'
+                 }}
+               >
+                 Continue Shopping
+               </button>
+             </div>
+           </div>
+         </div>
+       )}
       
         {/* Wishlist Modal */}
         {showWishlist && (
@@ -1386,7 +1932,7 @@ function App() {
                     <li key={idx} className="modal-item-card">
                       <div className="modal-item-img">
                         {item.images && item.images.length > 0 ? (
-                          <img src={item.images[0]} alt={item.name} />
+                          <img loading="lazy" src={item.images[0]} alt={item.name} />
                         ) : (
                           <i className={`fa-solid ${item.icon || 'fa-box'}`}></i>
                         )}
@@ -1460,7 +2006,7 @@ function App() {
           
           {offerData.poster && (
             <div className="offer-poster" style={{ width: '100%', maxHeight: '400px', overflow: 'hidden' }}>
-              <img src={offerData.poster} alt="Special Offer" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              <img loading="lazy" src={offerData.poster} alt="Special Offer" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
             </div>
           )}
           
@@ -1535,312 +2081,257 @@ function App() {
       {/* ============================================================
            PREMIUM USER LOGIN PORTAL — Full-Screen Split Layout
       ============================================================ */}
-      {showAuthModal && (
-        <div
-          id="authModal"
-          style={{
-            position: 'fixed', inset: 0, zIndex: 9000,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: 'rgba(0,0,0,0.55)',
-            backdropFilter: 'blur(8px)',
-            WebkitBackdropFilter: 'blur(8px)',
-            animation: 'fadeInPortal 0.3s ease',
-            padding: '1rem'
-          }}
-        >
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: '1fr 1fr',
-            width: '100%', maxWidth: '860px',
-            minHeight: '560px',
-            borderRadius: '24px',
-            overflow: 'hidden',
-            boxShadow: '0 32px 80px rgba(0,0,0,0.35), 0 0 0 1px rgba(255,255,255,0.08)',
-            animation: 'slideUpPortal 0.4s cubic-bezier(0.34,1.56,0.64,1)',
-            background: '#fff'
-          }} className="auth-portal-grid">
-
-            {/* ── LEFT: Brand Panel ── */}
-            <div style={{
-              background: 'linear-gradient(145deg, #14532d 0%, #16a34a 45%, #4ade80 100%)',
-              padding: '3rem 2.5rem',
-              display: 'flex', flexDirection: 'column',
-              justifyContent: 'space-between',
-              position: 'relative', overflow: 'hidden'
-            }}>
-              {/* Decorative circles */}
-              <div style={{ position:'absolute', top:'-60px', left:'-60px', width:'220px', height:'220px', borderRadius:'50%', background:'rgba(255,255,255,0.07)', pointerEvents:'none' }} />
-              <div style={{ position:'absolute', bottom:'-80px', right:'-50px', width:'280px', height:'280px', borderRadius:'50%', background:'rgba(255,255,255,0.05)', pointerEvents:'none' }} />
-              <div style={{ position:'absolute', top:'40%', left:'60%', width:'120px', height:'120px', borderRadius:'50%', background:'rgba(255,255,255,0.06)', pointerEvents:'none' }} />
-
-              {/* Logo */}
-              <div>
-                <div style={{ display:'flex', alignItems:'center', gap:'10px', marginBottom:'2.5rem' }}>
-                  <div style={{ width:'42px', height:'42px', borderRadius:'12px', background:'rgba(255,255,255,0.2)', display:'flex', alignItems:'center', justifyContent:'center', backdropFilter:'blur(8px)' }}>
-                    <i className="fa-solid fa-leaf" style={{ color:'white', fontSize:'1.2rem' }}></i>
-                  </div>
-                  <span style={{ color:'white', fontWeight:800, fontSize:'1.4rem', letterSpacing:'0.5px' }}>SriTech</span>
-                </div>
-                <h2 style={{ color:'white', fontSize:'2rem', fontWeight:800, lineHeight:1.2, marginBottom:'1rem' }}>
-                  {authMode === 'login' ? 'Welcome\nBack! 👋' : authMode === 'signup' ? 'Join Our\nFamily 🌿' : 'Almost\nThere! 📬'}
-                </h2>
-                <p style={{ color:'rgba(255,255,255,0.82)', fontSize:'0.95rem', lineHeight:1.6 }}>
-                  {authMode === 'login'
-                    ? 'Sign in to explore premium products, track orders, and enjoy exclusive member benefits.'
-                    : authMode === 'signup'
-                    ? 'Create your account today and unlock personalized shopping, early access deals & more.'
-                    : `We've sent a 6-digit code to ${userCredentials.email}. Check your inbox!`}
-                </p>
-              </div>
-
-              {/* Feature bullets */}
-              <div style={{ display:'flex', flexDirection:'column', gap:'0.85rem' }}>
-                {[
-                  { icon:'fa-shield-halved', text:'Secure & encrypted account' },
-                  { icon:'fa-truck-fast',    text:'Track all your orders in real-time' },
-                  { icon:'fa-tag',           text:'Exclusive member-only discounts' },
-                ].map((f, i) => (
-                  <div key={i} style={{ display:'flex', alignItems:'center', gap:'10px' }}>
-                    <div style={{ width:'32px', height:'32px', borderRadius:'8px', background:'rgba(255,255,255,0.15)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
-                      <i className={`fa-solid ${f.icon}`} style={{ color:'white', fontSize:'0.85rem' }}></i>
-                    </div>
-                    <span style={{ color:'rgba(255,255,255,0.9)', fontSize:'0.85rem', fontWeight:500 }}>{f.text}</span>
-                  </div>
-                ))}
-              </div>
+      {showAuthModal && createPortal(
+        <div className="auth-split-overlay">
+          
+          {/* ── LEFT PANE: Cinematic Background ── */}
+          <div className="auth-left-pane">
+            <div className="auth-left-content">
+              <h2>Cook Smarter.<span>Save More.</span></h2>
+              <p className="auth-subhead">Join thousands of customers using fuel-efficient Rocket Stoves for sustainable cooking and a cleaner future.</p>
+              <ul className="auth-trust-list">
+                <li><i className="fa-solid fa-shield-halved"></i> Secure Login & Checkout</li>
+                <li><i className="fa-solid fa-truck-fast"></i> Lightning Fast Delivery Tracking</li>
+                <li><i className="fa-solid fa-headset"></i> 24/7 Dedicated Support</li>
+                <li><i className="fa-solid fa-leaf"></i> 100% Eco-Friendly Materials</li>
+              </ul>
             </div>
+            
+            {/* Floating embers animation */}
+            {[...Array(12)].map((_, i) => (
+              <div 
+                key={i} 
+                className="ember" 
+                style={{ 
+                  left: `${Math.random() * 100}%`, 
+                  animationDelay: `${Math.random() * 3}s`,
+                  animationDuration: `${3 + Math.random() * 4}s`,
+                  width: `${3 + Math.random() * 4}px`,
+                  height: `${3 + Math.random() * 4}px`
+                }}
+              />
+            ))}
+          </div>
 
-            {/* ── RIGHT: Form Panel ── */}
-            <div style={{ padding:'2.5rem 2.5rem', display:'flex', flexDirection:'column', justifyContent:'center', background:'#ffffff', overflowY:'auto' }}>
+          {/* ── RIGHT PANE: Glassmorphism Form ── */}
+          <div className="auth-right-pane">
+            <div className="auth-glass-card">
+              <button
+                className="auth-close-btn"
+                onClick={() => { setShowAuthModal(false); setAuthMode('login'); setUserCredentials({ name:'',email:'',password:'',confirmPassword:'' }); setOtpCode(''); }}
+                aria-label="Close"
+              >
+                <i className="fa-solid fa-xmark"></i>
+              </button>
 
-              {/* Close button — only shown if portal is NOT a mandatory gate */}
-              {!authPortalIsGate && (
-                <button
-                  onClick={() => { setShowAuthModal(false); setAuthMode('login'); setUserCredentials({ name:'',email:'',password:'',confirmPassword:'' }); setOtpCode(''); }}
-                  style={{ position:'absolute', top:'1rem', right:'1rem', background:'rgba(0,0,0,0.06)', border:'none', width:'34px', height:'34px', borderRadius:'50%', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'1.1rem', color:'#64748b', transition:'all 0.2s' }}
-                  aria-label="Close"
-                  onMouseOver={e => e.currentTarget.style.background='rgba(239,68,68,0.12)'}
-                  onMouseOut={e => e.currentTarget.style.background='rgba(0,0,0,0.06)'}
+              <div className="auth-header">
+                <h3>{authMode === 'login' ? 'Welcome Back' : 'Create Account'}</h3>
+                <p>{authMode === 'login' ? 'Sign in to your premium account' : 'Start your sustainable journey today'}</p>
+              </div>
+
+              {/* Toggle Switch */}
+              <div className="auth-toggle-group">
+                <button 
+                  type="button"
+                  className={`auth-toggle-btn ${authMode === 'login' ? 'active' : ''}`}
+                  onClick={() => setAuthMode('login')}
                 >
-                  <i className="fa-solid fa-xmark"></i>
+                  Sign In
                 </button>
-              )}
+                <button 
+                  type="button"
+                  className={`auth-toggle-btn ${authMode === 'signup' ? 'active' : ''}`}
+                  onClick={() => setAuthMode('signup')}
+                >
+                  Sign Up
+                </button>
+              </div>
 
-              {/* Tab switcher */}
-              {authMode !== 'verify-otp' && (
-                <div style={{ display:'flex', background:'#f0fdf4', borderRadius:'12px', padding:'4px', marginBottom:'1.75rem', border:'1px solid #d1fae5' }}>
-                  {['login','signup'].map(mode => (
-                    <button
-                      key={mode}
-                      type="button"
-                      onClick={() => setAuthMode(mode)}
-                      style={{
-                        flex:1, padding:'0.6rem', borderRadius:'9px', border:'none',
-                        fontWeight:600, fontSize:'0.9rem', cursor:'pointer',
-                        background: authMode === mode ? 'var(--primary-color)' : 'transparent',
-                        color: authMode === mode ? 'white' : '#64748b',
-                        transition:'all 0.25s ease',
-                        boxShadow: authMode === mode ? '0 4px 12px rgba(22,163,74,0.3)' : 'none'
-                      }}
-                    >
-                      {mode === 'login' ? '🔑 Sign In' : '✨ Sign Up'}
-                    </button>
-                  ))}
-                </div>
-              )}
+              <form onSubmit={handleUserAuthSubmit}>
+                
+                {/* Sign Up Specific Fields */}
+                {authMode === 'signup' && (
+                  <>
+                    <div className="auth-form-group">
+                      <label>Full Name</label>
+                      <div className="auth-input-wrapper">
+                        <i className="fa-regular fa-user prefix-icon"></i>
+                        <input 
+                          type="text" 
+                          name="name"
+                          className="auth-input" 
+                          placeholder="John Doe" 
+                          required
+                          value={userCredentials.name}
+                          onChange={(e) => updateUserCredentials('name', e.target.value)}
+                        />
+                      </div>
+                    </div>
+                    <div className="auth-form-group">
+                      <label>Mobile Number</label>
+                      <div className="auth-input-wrapper">
+                        <i className="fa-solid fa-phone prefix-icon"></i>
+                        <input 
+                          type="tel" 
+                          name="phone"
+                          className="auth-input" 
+                          placeholder="+1 (555) 000-0000" 
+                          required
+                          value={userCredentials.phone}
+                          onChange={(e) => updateUserCredentials('phone', e.target.value)}
+                        />
+                      </div>
+                    </div>
+                    <div className="auth-form-group">
+                      <label>Address</label>
+                      <div className="auth-input-wrapper">
+                        <i className="fa-solid fa-map-location-dot prefix-icon"></i>
+                        <input 
+                          type="text" 
+                          name="address"
+                          className="auth-input" 
+                          placeholder="123 Street Name" 
+                          required
+                          value={userCredentials.address || ''}
+                          onChange={(e) => updateUserCredentials('address', e.target.value)}
+                        />
+                      </div>
+                    </div>
+                  </>
+                )}
 
-              <h3 style={{ fontSize:'1.5rem', fontWeight:800, color:'#14532d', marginBottom:'0.35rem' }}>
-                {authMode === 'login' ? 'Sign in to your account' : authMode === 'signup' ? 'Create your account' : 'Enter your OTP'}
-              </h3>
-              <p style={{ fontSize:'0.85rem', color:'#64748b', marginBottom:'1.5rem' }}>
-                {authMode === 'verify-otp' ? `6-digit code sent to ${userCredentials.email}` : 'Fill in your details below to continue'}
-              </p>
-
-              <form onSubmit={handleUserAuthSubmit} style={{ display:'flex', flexDirection:'column', gap:'1rem' }}>
-
-                {/* OTP Mode */}
                 {authMode === 'verify-otp' && (
-                  <div>
-                    <label style={{ fontSize:'0.8rem', fontWeight:600, color:'#475569', display:'block', marginBottom:'6px' }}>
-                      <i className="fa-solid fa-key" style={{ marginRight:'5px', color:'var(--primary-color)' }}></i>OTP Code
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="• • • • • •"
+                  <div className="auth-form-group">
+                    <label>Verification Code</label>
+                    <div className="auth-input-wrapper">
+                      <i className="fa-solid fa-key prefix-icon"></i>
+                      <input 
+                        type="text" 
+                        className="auth-input" 
+                        placeholder="Enter 6-digit code" 
+                        required
+                        value={otpCode}
+                        onChange={(e) => setOtpCode(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Common Fields: Email */}
+                <div className="auth-form-group">
+                  <label>Email Address</label>
+                  <div className="auth-input-wrapper">
+                    <i className="fa-regular fa-envelope prefix-icon"></i>
+                    <input 
+                      type="email" 
+                      name="email"
+                      className="auth-input" 
+                      placeholder="hello@example.com" 
                       required
-                      maxLength={6}
-                      value={otpCode}
-                      onChange={(e) => setOtpCode(e.target.value.replace(/\D/g,''))}
-                      autoComplete="off"
-                      style={{
-                        width:'100%', padding:'1rem', textAlign:'center',
-                        letterSpacing:'12px', fontSize:'1.6rem', fontWeight:700,
-                        border:'2px solid #d1fae5', borderRadius:'12px',
-                        outline:'none', color:'var(--primary-dark)',
-                        background:'#f0fdf4', fontFamily:'monospace',
-                        transition:'border-color 0.2s'
-                      }}
-                      onFocus={e => e.target.style.borderColor='var(--primary-color)'}
-                      onBlur={e => e.target.style.borderColor='#d1fae5'}
+                      value={userCredentials.email}
+                      onChange={(e) => updateUserCredentials('email', e.target.value)}
                     />
-                    <div style={{ textAlign:'center', marginTop:'0.75rem' }}>
-                      <button
-                        type="button"
-                        onClick={handleResendOtp}
-                        disabled={resendTimer > 0}
-                        style={{
-                          background:'none', border:'none', cursor: resendTimer > 0 ? 'not-allowed' : 'pointer',
-                          color: resendTimer > 0 ? '#94a3b8' : 'var(--primary-color)',
-                          fontWeight:600, fontSize:'0.85rem',
-                          textDecoration: resendTimer > 0 ? 'none' : 'underline'
-                        }}
-                      >
-                        {resendTimer > 0 ? `Resend in ${resendTimer}s` : 'Resend OTP'}
+                  </div>
+                </div>
+
+                {/* Common Fields: Password */}
+                {authMode !== 'verify-otp' && (
+                  <div className="auth-form-group">
+                    <label>Password</label>
+                    <div className="auth-input-wrapper">
+                      <i className="fa-solid fa-lock prefix-icon"></i>
+                      <input 
+                        type={showPassword ? "text" : "password"} 
+                        name="password"
+                        className="auth-input" 
+                        placeholder="••••••••" 
+                        required
+                        value={userCredentials.password}
+                        onChange={(e) => updateUserCredentials('password', e.target.value)}
+                      />
+                      <button type="button" className="pwd-toggle" onClick={() => setShowPassword(!showPassword)}>
+                        <i className={`fa-regular ${showPassword ? 'fa-eye-slash' : 'fa-eye'}`}></i>
                       </button>
                     </div>
                   </div>
                 )}
 
-                {/* Login / Signup fields */}
-                {authMode !== 'verify-otp' && (
-                  <>
-                    {authMode === 'signup' && (
-                      <div>
-                        <label style={{ fontSize:'0.8rem', fontWeight:600, color:'#475569', display:'block', marginBottom:'6px' }}>
-                          <i className="fa-regular fa-user" style={{ marginRight:'5px', color:'var(--primary-color)' }}></i>Full Name
-                        </label>
-                        <input
-                          type="text" placeholder="e.g. Sankarganesh R" required
-                          value={userCredentials.name}
-                          onChange={(e) => setUserCredentials({...userCredentials, name: e.target.value})}
-                          autoComplete="off"
-                          style={{ width:'100%', padding:'0.75rem 1rem', border:'1.5px solid #e2e8f0', borderRadius:'10px', outline:'none', fontSize:'0.9rem', background:'#fafafa', transition:'all 0.2s', boxSizing:'border-box' }}
-                          onFocus={e => { e.target.style.borderColor='var(--primary-color)'; e.target.style.boxShadow='0 0 0 3px rgba(22,163,74,0.12)'; e.target.style.background='white'; }}
-                          onBlur={e => { e.target.style.borderColor='#e2e8f0'; e.target.style.boxShadow='none'; e.target.style.background='#fafafa'; }}
-                        />
-                      </div>
-                    )}
-                    <div>
-                      <label style={{ fontSize:'0.8rem', fontWeight:600, color:'#475569', display:'block', marginBottom:'6px' }}>
-                        <i className="fa-regular fa-envelope" style={{ marginRight:'5px', color:'var(--primary-color)' }}></i>Email Address
-                      </label>
-                      <input
-                        type="email" placeholder="you@example.com" required
-                        value={userCredentials.email}
-                        onChange={(e) => setUserCredentials({...userCredentials, email: e.target.value})}
-                        autoComplete="off"
-                        style={{ width:'100%', padding:'0.75rem 1rem', border:'1.5px solid #e2e8f0', borderRadius:'10px', outline:'none', fontSize:'0.9rem', background:'#fafafa', transition:'all 0.2s', boxSizing:'border-box' }}
-                        onFocus={e => { e.target.style.borderColor='var(--primary-color)'; e.target.style.boxShadow='0 0 0 3px rgba(22,163,74,0.12)'; e.target.style.background='white'; }}
-                        onBlur={e => { e.target.style.borderColor='#e2e8f0'; e.target.style.boxShadow='none'; e.target.style.background='#fafafa'; }}
+                {/* Sign Up Specific Field: Confirm Password */}
+                {authMode === 'signup' && (
+                  <div className="auth-form-group">
+                    <label>Confirm Password</label>
+                    <div className="auth-input-wrapper">
+                      <i className="fa-solid fa-shield-check prefix-icon"></i>
+                      <input 
+                        type={showConfirmPassword ? "text" : "password"} 
+                        name="confirmPassword"
+                        className="auth-input" 
+                        placeholder="••••••••" 
+                        required
+                        value={userCredentials.confirmPassword}
+                        onChange={(e) => updateUserCredentials('confirmPassword', e.target.value)}
                       />
+                      <button type="button" className="pwd-toggle" onClick={() => setShowConfirmPassword(!showConfirmPassword)}>
+                        <i className={`fa-regular ${showConfirmPassword ? 'fa-eye-slash' : 'fa-eye'}`}></i>
+                      </button>
                     </div>
-                    <div>
-                      <label style={{ fontSize:'0.8rem', fontWeight:600, color:'#475569', display:'block', marginBottom:'6px' }}>
-                        <i className="fa-solid fa-lock" style={{ marginRight:'5px', color:'var(--primary-color)' }}></i>Password
-                      </label>
-                      <input
-                        type="password" placeholder="••••••••" required
-                        value={userCredentials.password}
-                        onChange={(e) => setUserCredentials({...userCredentials, password: e.target.value})}
-                        autoComplete="new-password"
-                        style={{ width:'100%', padding:'0.75rem 1rem', border:'1.5px solid #e2e8f0', borderRadius:'10px', outline:'none', fontSize:'0.9rem', background:'#fafafa', transition:'all 0.2s', boxSizing:'border-box' }}
-                        onFocus={e => { e.target.style.borderColor='var(--primary-color)'; e.target.style.boxShadow='0 0 0 3px rgba(22,163,74,0.12)'; e.target.style.background='white'; }}
-                        onBlur={e => { e.target.style.borderColor='#e2e8f0'; e.target.style.boxShadow='none'; e.target.style.background='#fafafa'; }}
-                      />
-                    </div>
-                    {authMode === 'signup' && (
-                      <div>
-                        <label style={{ fontSize:'0.8rem', fontWeight:600, color:'#475569', display:'block', marginBottom:'6px' }}>
-                          <i className="fa-solid fa-lock" style={{ marginRight:'5px', color:'var(--primary-color)' }}></i>Confirm Password
-                        </label>
-                        <input
-                          type="password" placeholder="••••••••" required
-                          value={userCredentials.confirmPassword}
-                          onChange={(e) => setUserCredentials({...userCredentials, confirmPassword: e.target.value})}
-                          autoComplete="new-password"
-                          style={{ width:'100%', padding:'0.75rem 1rem', border:'1.5px solid #e2e8f0', borderRadius:'10px', outline:'none', fontSize:'0.9rem', background:'#fafafa', transition:'all 0.2s', boxSizing:'border-box' }}
-                          onFocus={e => { e.target.style.borderColor='var(--primary-color)'; e.target.style.boxShadow='0 0 0 3px rgba(22,163,74,0.12)'; e.target.style.background='white'; }}
-                          onBlur={e => { e.target.style.borderColor='#e2e8f0'; e.target.style.boxShadow='none'; e.target.style.background='#fafafa'; }}
-                        />
-                      </div>
-                    )}
-                  </>
+                  </div>
+                )}
+
+                {/* Login Options: Remember Me & Forgot Password */}
+                {authMode === 'login' && (
+                  <div className="auth-options">
+                    <label className="remember-me">
+                      <input type="checkbox" /> Remember me
+                    </label>
+                    <a href="#" className="forgot-pwd" onClick={(e) => { e.preventDefault(); showToast("Reset link sent to your email.", "success"); }}>Forgot Password?</a>
+                  </div>
                 )}
 
                 {/* Submit Button */}
-                <button
-                  type="submit"
-                  style={{
-                    width:'100%', padding:'0.85rem',
-                    background:'linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%)',
-                    color:'white', border:'none', borderRadius:'12px',
-                    fontWeight:700, fontSize:'1rem', cursor:'pointer',
-                    boxShadow:'0 6px 20px rgba(22,163,74,0.35)',
-                    transition:'all 0.3s cubic-bezier(0.34,1.56,0.64,1)',
-                    marginTop:'0.25rem'
-                  }}
-                  onMouseOver={e => { e.currentTarget.style.transform='translateY(-2px)'; e.currentTarget.style.boxShadow='0 10px 28px rgba(22,163,74,0.4)'; }}
-                  onMouseOut={e => { e.currentTarget.style.transform='translateY(0)'; e.currentTarget.style.boxShadow='0 6px 20px rgba(22,163,74,0.35)'; }}
-                >
-                  {authMode === 'login' ? '🔑 Sign In to Account' : authMode === 'signup' ? '🚀 Create My Account' : '✅ Verify & Continue'}
+                <button type="submit" className="auth-submit-btn" disabled={authSubmitting}>
+                  {authSubmitting ? (authMode === 'login' ? 'Signing In...' : authMode === 'verify-otp' ? 'Verifying...' : 'Creating Account...') : (authMode === 'login' ? 'Sign In' : authMode === 'verify-otp' ? 'Verify Code' : 'Create Account')}
                 </button>
 
-                {/* Go back link for OTP mode */}
                 {authMode === 'verify-otp' && (
-                  <button type="button" onClick={() => setAuthMode('signup')}
-                    style={{ background:'none', border:'none', color:'#64748b', fontSize:'0.85rem', cursor:'pointer', textDecoration:'underline', textAlign:'center' }}>
-                    ← Wrong email? Go back
-                  </button>
-                )}
-              </form>
-
-              {/* Terms note */}
-              {authMode === 'signup' && (
-                <p style={{ fontSize:'0.75rem', color:'#94a3b8', textAlign:'center', marginTop:'1rem', lineHeight:1.5 }}>
-                  By signing up, you agree to our <span style={{ color:'var(--primary-color)', fontWeight:600 }}>Terms of Service</span> and <span style={{ color:'var(--primary-color)', fontWeight:600 }}>Privacy Policy</span>.
-                </p>
-              )}
-
-              {/* Continue as Guest — always visible */}
-              {authMode !== 'verify-otp' && (
-                <div style={{ textAlign:'center', marginTop:'1.25rem', paddingTop:'1rem', borderTop:'1px solid #f1f5f9' }}>
                   <button
                     type="button"
-                    onClick={() => {
-                      setShowAuthModal(false);
-                      setAuthPortalIsGate(false);
-                      setAuthMode('login');
-                      setUserCredentials({ name:'',email:'',password:'',confirmPassword:'' });
-                    }}
-                    style={{
-                      background: 'none', border: 'none',
-                      color: '#64748b', fontSize: '0.85rem',
-                      cursor: 'pointer', fontWeight: 500,
-                      display: 'inline-flex', alignItems: 'center', gap: '5px',
-                      padding: '0.4rem 0.75rem', borderRadius: '8px',
-                      transition: 'all 0.2s'
-                    }}
-                    onMouseOver={e => { e.currentTarget.style.background = '#f0fdf4'; e.currentTarget.style.color = 'var(--primary-color)'; }}
-                    onMouseOut={e => { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = '#64748b'; }}
+                    className="auth-submit-btn"
+                    style={{ marginTop: '0.75rem', background: 'transparent', color: '#38bdf8', border: '1px solid rgba(56, 189, 248, 0.3)' }}
+                    onClick={handleResendOtp}
                   >
-                    <i className="fa-solid fa-arrow-right" style={{ fontSize: '0.75rem' }}></i>
-                    Continue as Guest
+                    Resend Code
                   </button>
-                </div>
-              )}
+                )}
+                
+              </form>
+
+              <div className="auth-divider">or continue with</div>
+
+              {/* Social Login Options */}
+              <div className="social-login-grid">
+              </div>
+
+              {/* Continue as Guest */}
+              <div style={{ textAlign: 'center', marginTop: '2rem' }}>
+                <button 
+                  type="button"
+                  onClick={() => {
+                    setShowAuthModal(false);
+                    setAuthPortalIsGate(false);
+                    setAuthMode('login');
+                  }}
+                  style={{ background: 'transparent', border: 'none', color: '#94a3b8', fontSize: '0.9rem', cursor: 'pointer' }}
+                >
+                  <i className="fa-solid fa-arrow-right" style={{ marginRight: '8px' }}></i>
+                  Continue as Guest
+                </button>
+              </div>
+
             </div>
           </div>
-
-          {/* Inline keyframe styles */}
-          <style>{`
-            @keyframes fadeInPortal { from { opacity:0 } to { opacity:1 } }
-            @keyframes slideUpPortal { from { opacity:0; transform: translateY(40px) scale(0.95) } to { opacity:1; transform: translateY(0) scale(1) } }
-            @media (max-width: 640px) {
-              .auth-portal-grid { grid-template-columns: 1fr !important; }
-              .auth-portal-grid > div:first-child { display: none !important; }
-            }
-          `}</style>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Complaint / Support Modal */}
@@ -1903,11 +2394,11 @@ function App() {
       {/* Header */}
       <header className="top-header">
         <div className="header-container">
-          <a href="#" className="logo">
-            <span className="logo-main-text">SriTech</span>
-            <span className="logo-sub-text">Explore <span>Plus <i className="fa-solid fa-plus" style={{ fontSize: '0.6rem' }}></i></span></span>
+          <a href="#" className="logo" style={{ display: 'flex', alignItems: 'center', textDecoration: 'none' }}>
+            <img src="/sri-tech-logo-final.png" alt="SriTech Logo" style={{ height: '110px', width: 'auto', objectFit: 'contain', background: 'transparent', padding: 0, border: 'none', boxShadow: 'none' }} />
           </a>
 
+          {/* 1. Search Box */}
           <div className="search-container" ref={searchContainerRef}>
             <input 
               type="text" 
@@ -1916,12 +2407,19 @@ function App() {
               placeholder="Search for products, categories and more" 
               value={searchTerm}
               onChange={(e) => {
-                setSearchTerm(e.target.value);
+                const nextValue = e.target.value;
+                setSearchTerm(nextValue);
                 setShowSuggestions(true);
               }}
               onFocus={() => setShowSuggestions(true)}
             />
-            <i className="fa-solid fa-magnifying-glass search-icon-inside" onClick={handleRefresh}></i>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <i className="fa-solid fa-magnifying-glass search-icon-inside" onClick={() => {
+                const input = document.getElementById('searchInput');
+                if (input) input.focus();
+                setShowSuggestions(true);
+              }}></i>
+            </div>
             {showSuggestions && searchTerm.trim() !== "" && (
               <div className="search-suggestions-dropdown">
                 <div className="search-suggestions-header">Product Suggestions</div>
@@ -1934,7 +2432,7 @@ function App() {
                     >
                       <div className="search-suggestion-img">
                         {prod.images && prod.images.length > 0 ? (
-                          <img src={prod.images[0]} alt={prod.name} />
+                          <img loading="lazy" src={prod.images[0]} alt={prod.name} />
                         ) : (
                           <i className={`fa-solid ${prod.icon || 'fa-box'}`}></i>
                         )}
@@ -1976,28 +2474,14 @@ function App() {
             )}
           </div>
 
-          <div className="header-actions">
-            <div className="user-profile-actions">
-              {isUserLoggedIn ? (
-                <div className="logged-in-user" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                   <span style={{ color: 'white', fontWeight: 600, fontSize: '0.9rem' }}>{activeUser?.name}</span>
-                   <button onClick={handleLogout} className="action-btn" title="Logout" style={{ opacity: 0.8 }} aria-label="Logout">
-                    <i className="fa-solid fa-power-off" aria-hidden="true"></i>
-                  </button>
-                </div>
-              ) : (
-                <button 
-                  className="header-login-btn" 
-                  onClick={() => { 
-                    setAuthMode('login'); 
-                    setShowAuthModal(true); 
-                    setUserCredentials({ name: '', email: '', password: '' });
-                  }}
-                >
-                  Login
-                </button>
-              )}
-            </div>
+          <div className={`header-actions ${isMobileMenuOpen ? 'mobile-open' : ''}`}>
+            <a href="#home" className="action-btn" onClick={(e) => { setIsMobileMenuOpen(false); scrollToSection(e, 'home'); }} style={{ textDecoration: 'none', color: 'white', fontSize: '0.9rem', fontWeight: 600 }}>
+              Home
+            </a>
+
+            <a href="#footer" className="action-btn" onClick={(e) => { setIsMobileMenuOpen(false); e.preventDefault(); const footer = document.getElementById('footer'); if (footer) footer.scrollIntoView({ behavior: 'smooth' }); }} style={{ textDecoration: 'none', color: 'white', fontSize: '0.9rem', fontWeight: 600 }}>
+              Contact
+            </a>
 
             <button className="action-btn" title="Wishlist" aria-label="View wishlist" onClick={() => setShowWishlist(true)}>
               <i className={waitlist.length > 0 ? "fa-solid fa-heart" : "fa-regular fa-heart"} aria-hidden="true" style={waitlist.length > 0 ? {color: 'var(--accent-yellow)'} : {}}></i>
@@ -2010,210 +2494,258 @@ function App() {
               {cart.length > 0 && <span className="cart-count">{cart.length}</span>}
             </button>
 
-            <button 
-              className="action-btn" 
-              title="Raise a Complaint" 
-              aria-label="Raise a Complaint"
-              onClick={() => setShowComplaintModal(true)}
-              style={{ color: 'var(--accent-yellow)', fontSize: '0.9rem', fontWeight: 600 }}
-            >
-              <i className="fa-solid fa-headset"></i> Support
-            </button>
-
-            <button 
-              className={`action-btn refresh-btn ${isRefreshing ? 'spinning' : ''}`} 
-              onClick={handleRefresh}
-              title="Refresh Data"
-              aria-label="Refresh Data"
-              style={{ color: 'white' }}
-            >
-              <i className="fa-solid fa-arrows-rotate"></i>
-            </button>
-          </div>
-        </div>
-      </header>
-
-      {/* Category Navigation Bar (Flipkart-Style) */}
-      <div className="category-bar-wrapper">
-        <div className="category-bar-container">
-          {['all', ...categories].map(cat => {
-            let iconClass = 'fa-boxes-stacked';
-            if (cat === 'all') iconClass = 'fa-border-all';
-            else if (cat.includes('stove')) iconClass = 'fa-fire';
-            else if (cat.includes('appliances')) iconClass = 'fa-home';
-            else if (cat.includes('welding')) iconClass = 'fa-bolt';
-            else if (cat.includes('engraining') || cat.includes('engraver')) iconClass = 'fa-gears';
-
-            return (
-              <button 
-                key={cat}
-                className={`category-bar-item ${selectedCategory === cat ? 'active' : ''}`}
-                onClick={() => {
-                  handleCategoryChange(cat);
-                  const el = document.getElementById('product');
-                  if (el) el.scrollIntoView({ behavior: 'smooth' });
-                }}
-              >
-                <i className={`fa-solid ${iconClass}`}></i>
-                <span>{cat === 'all' ? 'All Products' : cat.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}</span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-
-      <main>
-        {/* Promo Offer Banner (Flipkart-Style Carousel) */}
-        {offerData && (
-          <div className="promo-carousel">
-            <div className="promo-banner">
-              <div className="promo-banner-content">
-                <span className="promo-badge">Limited Time Offer</span>
-                <h2 style={{ marginTop: '0.5rem' }}>{offerData.title || 'Special Deal Alert!'}</h2>
-                <p style={{ marginTop: '0.5rem' }}>{offerData.description || 'Check out our premium collection and get massive discounts.'}</p>
-                {offerData.code && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.75rem' }}>
-                    <span style={{ fontSize: '0.9rem', fontWeight: 600 }}>Use Code:</span>
-                    <span style={{ border: '1.5px dashed var(--accent-yellow)', padding: '0.2rem 0.6rem', borderRadius: '2px', background: 'rgba(255, 255, 255, 0.1)', color: 'var(--accent-yellow)', fontWeight: 800, letterSpacing: '0.5px', fontSize: '0.85rem' }}>
-                      {offerData.code}
-                    </span>
-                  </div>
-                )}
-              </div>
-              {offerData.poster ? (
-                <div style={{ maxWidth: '280px', height: '140px' }}>
-                  <img src={offerData.poster} alt="Offer poster" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+            <div className="user-profile-actions">
+              {isUserLoggedIn ? (
+                <div className="logged-in-user" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                   <span style={{ color: 'white', fontWeight: 600, fontSize: '0.9rem' }}>{activeUser?.name}</span>
+                   <button onClick={handleLogout} className="action-btn" title="Logout" style={{ opacity: 0.8 }} aria-label="Logout">
+                    <i className="fa-solid fa-power-off" aria-hidden="true"></i>
+                  </button>
                 </div>
               ) : (
-                <button className="promo-banner-action" onClick={(e) => scrollToSection(e, 'product')}>
-                  Shop Now
+                <button 
+                  className="header-login-btn" 
+                  onClick={() => { 
+                    if (isUserLoggedIn) return;
+                    setAuthMode('login'); 
+                    setShowAuthModal(true); 
+                    setUserCredentials({ name: '', email: '', password: '' });
+                  }}
+                >
+                  Login
                 </button>
               )}
             </div>
           </div>
-        )}
+        </div>
+      </header>
 
-        {/* Active Product Coupons (Flipkart-style Coupon row) */}
-        {coupons.filter(c => c.isActive && c.linkedProduct).length > 0 && (
-          <div className="coupons-offers-row" style={{ padding: '1rem 2rem', background: '#f1f5f9', borderBottom: '1px solid #e2e8f0' }}>
-            <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
-              <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#0f172a', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <i className="fa-solid fa-ticket" style={{ color: '#4f46e5' }}></i> Linked Product Coupon Offers
-              </h3>
-              <div className="coupons-offers-container" style={{ display: 'flex', gap: '1rem', overflowX: 'auto', paddingBottom: '0.5rem' }}>
-                {coupons.filter(c => c.isActive && c.linkedProduct && (!c.expiryDate || new Date(c.expiryDate) > new Date())).map(c => {
-                  const linkedProd = products.find(p => (p._id || p.id) === c.linkedProduct);
-                  if (!linkedProd) return null;
-                  return (
-                    <div key={c._id || c.code} className="coupon-deal-card" style={{ 
-                      minWidth: '280px', background: 'white', borderRadius: '8px', border: '1px solid #e2e8f0', 
-                      padding: '0.75rem', display: 'flex', gap: '0.75rem', alignItems: 'center', boxShadow: '0 2px 4px rgba(0,0,0,0.02)'
-                    }}>
-                      <div style={{ width: '60px', height: '60px', borderRadius: '4px', background: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
-                        {linkedProd.images && linkedProd.images.length > 0 ? (
-                          <img src={linkedProd.images[0]} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
-                        ) : (
-                          <i className={`fa-solid ${linkedProd.icon || 'fa-box'}`} style={{ color: '#4f46e5', fontSize: '1.5rem' }}></i>
-                        )}
-                      </div>
-                      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2px', overflow: 'hidden' }}>
-                        <span style={{ fontSize: '0.7rem', fontWeight: 700, color: '#059669', background: 'rgba(16, 185, 129, 0.08)', padding: '2px 6px', borderRadius: '4px', alignSelf: 'flex-start' }}>
-                          {c.discountValue}{c.discountType === 'Percentage' ? '%' : '₹'} OFF
-                        </span>
-                        <strong style={{ fontSize: '0.85rem', color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '180px' }}>{linkedProd.name}</strong>
-                        <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Use Code: <strong style={{ color: '#4f46e5' }}>{c.code}</strong></span>
-                      </div>
-                      <button 
-                        onClick={() => { setSelectedProduct(linkedProd); setSelectedProductImageIndex(0); }} 
-                        style={{ background: '#4f46e5', color: 'white', border: 'none', borderRadius: '4px', padding: '0.4rem 0.6rem', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}
-                      >
-                        View
-                      </button>
-                    </div>
-                  );
-                })}
+      <main>
+        {/* Premium Dark Parallax Hero Section */}
+        <section id="home" className="premium-hero">
+
+          <div className="premium-hero-content">
+            <div className="hero-text-content">
+              <div className="hero-badge-wrap">
+                <span className="premium-badge-text">COOK SMART. SAVE FUEL. SAVE NATURE.</span>
+              </div>
+              <h1>Efficient Cooking.<br/><span className="text-highlight-green">Better Future.</span></h1>
+              <p className="hero-subtitle">Rocket stoves use less fuel, produce less smoke, and deliver higher efficiency for a sustainable tomorrow.</p>
+              
+              <div className="hero-features-row">
+                <div className="feature-item-col">
+                  <i className="fa-solid fa-fire-leaf"></i>
+                  <div>
+                    <strong>Up to 80%</strong>
+                    <span>Less Fuel</span>
+                  </div>
+                </div>
+                <div className="feature-item-col">
+                  <i className="fa-solid fa-cloud-slash"></i>
+                  <div>
+                    <strong>Low Smoke</strong>
+                    <span>Clean Cooking</span>
+                  </div>
+                </div>
+                <div className="feature-item-col">
+                  <i className="fa-solid fa-bolt"></i>
+                  <div>
+                    <strong>High Efficiency</strong>
+                    <span>Better Performance</span>
+                  </div>
+                </div>
+                <div className="feature-item-col">
+                  <i className="fa-solid fa-tree"></i>
+                  <div>
+                    <strong>Eco Friendly</strong>
+                    <span>Sustainable Living</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="hero-cta-group hero-cta-center">
+              <a href="#product" className="primary-btn-green" onClick={(e) => scrollToSection(e, 'product')}>Explore Products <i className="fa-solid fa-arrow-right"></i></a>
+              <a href="#how-it-works" className="secondary-btn-outline" onClick={(e) => scrollToSection(e, 'how-it-works')}>Learn More <i className="fa-solid fa-play-circle"></i></a>
+            </div>
+
+            <div className="hero-image-wrapper">
+              <div className="circular-badge">
+                <svg viewBox="0 0 100 100">
+                  <path id="curve" d="M 50 50 m -37 0 a 37 37 0 1 1 74 0 a 37 37 0 1 1 -74 0" fill="transparent" />
+                  <text><textPath href="#curve" startOffset="0">COOK FASTER • SAVE MORE • LIVE BETTER • </textPath></text>
+                </svg>
+                <i className="fa-solid fa-leaf center-icon" style={{color: '#1E7A3B'}}></i>
               </div>
             </div>
           </div>
-        )}
+        </section>
 
-        {/* Hero Section */}
-        <section id="home" className="hero">
-          <div className="hero-content">
-            <h1>The Sri Tech</h1>
-            <p>
-              Sri Tech Engineering is a precision manufacturing company founded in 2020, specializing in Agro, Food & Poultry Machineries, Material Fabrication and Engineering Works.
-              <br /><br />
-              Based in Namakkal, Tamil Nadu, we operate two advanced manufacturing units in Athanoor and Vaiyappamalai. Our prestigious portfolio includes national-scale projects for Indian Railways, IOCL, SIDCO, and Smart City Highway infrastructures.
-              <br /><br />
-              Led by Sankarganesh R (CEO) and Ganga (MD), SM Group and Sri Tech Engineering focus on Delivering excellence through Innovation, Sustainability & Excellence. We bridge the gap between students and industry through technical skill development.
-            </p>
-            <a href="#product" className="cta-button" aria-label="Shop our sustainable technology products collection" onClick={(e) => scrollToSection(e, 'product')}>
-              Explore Sustainable Tech <i className="fa-solid fa-arrow-right"></i>
-            </a>
-          </div>
-          <div className="hero-image-carousel">
-            <div className="carousel-slide-container" style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden' }}>
-              <div 
-                className="carousel-track" 
-                style={{ 
-                  display: 'flex',
-                  width: `${displayBanners.length * 100}%`,
-                  height: '100%',
-                  transform: `translateX(-${(currentHeroIndex * 100) / displayBanners.length}%)`,
-                  transition: 'transform 0.8s cubic-bezier(0.4, 0, 0.2, 1)'
-                }}
-              >
-                {displayBanners.map((banner, index) => (
-                  <div 
-                    key={banner._id || index}
-                    className="carousel-slide"
-                    style={{
-                      width: `${100 / displayBanners.length}%`,
-                      height: '100%',
-                      position: 'relative',
-                      flexShrink: 0
-                    }}
-                  >
-                    <img 
-                      src={banner.image} 
-                      alt={banner.caption || "Sri Tech Premium Engineering Banner"} 
-                      loading="eager" 
-                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                    />
-                    {banner.caption && (
-                      <div className="carousel-caption">
-                        {banner.caption}
-                      </div>
-                    )}
-                  </div>
-                ))}
+        {/* Floating Stats Bar */}
+        <div className="stats-bar-wrapper">
+          <div className="stats-bar-green">
+            <div className="stat-item-row">
+              <i className="fa-solid fa-piggy-bank stat-icon"></i>
+              <div className="stat-text">
+                <h3>80%</h3>
+                <p>Less Fuel Consumption</p>
               </div>
-              {displayBanners.length > 1 && (
-                <div className="carousel-dots">
-                  {displayBanners.map((_, index) => (
-                    <button
-                      key={index}
-                      className={`carousel-dot ${index === currentHeroIndex ? 'active' : ''}`}
-                      onClick={() => setCurrentHeroIndex(index)}
-                      aria-label={`Go to slide ${index + 1}`}
-                    />
-                  ))}
+            </div>
+            <div className="stat-divider-light"></div>
+            <div className="stat-item-row">
+              <i className="fa-solid fa-cloud stat-icon"></i>
+              <div className="stat-text">
+                <h3>90%</h3>
+                <p>Less Smoke Emission</p>
+              </div>
+            </div>
+            <div className="stat-divider-light"></div>
+            <div className="stat-item-row">
+              <i className="fa-solid fa-fire stat-icon"></i>
+              <div className="stat-text">
+                <h3>2x</h3>
+                <p>More Efficiency</p>
+              </div>
+            </div>
+            <div className="stat-divider-light"></div>
+            <div className="stat-item-row">
+              <i className="fa-solid fa-leaf stat-icon"></i>
+              <div className="stat-text">
+                <h3>100%</h3>
+                <p>Eco Friendly</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* How It Works Section */}
+        <section id="how-it-works" className="how-it-works-section">
+          <div className="hiw-container">
+            <div className="section-header-dark">
+              <h2>Master the Elements</h2>
+              <p>The science of perfect combustion inside every Sri Tech stove.</p>
+            </div>
+            
+            <div className="hiw-grid">
+              <div className="hiw-illustration">
+                <div className="cutaway-diagram">
+                  <img src="/rocket-stove.png" alt="Stove Cutaway Diagram" className="cutaway-img" onError={(e) => { e.target.src = "https://images.unsplash.com/photo-1517433670267-08bbd4be890f?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80"; }} />
+                  <div className="airflow-animated"></div>
                 </div>
-              )}
+              </div>
+              <div className="hiw-steps">
+                <div className="step-card">
+                  <div className="step-number">01</div>
+                  <div className="step-info">
+                    <h4>Feed Wood</h4>
+                    <p>Load biomass or wood easily from the top or side intake port.</p>
+                  </div>
+                </div>
+                <div className="step-card">
+                  <div className="step-number">02</div>
+                  <div className="step-info">
+                    <h4>Airflow Ignites</h4>
+                    <p>Oxygen is rapidly pulled through the bottom draft, creating a powerful draft.</p>
+                  </div>
+                </div>
+                <div className="step-card">
+                  <div className="step-number">03</div>
+                  <div className="step-info">
+                    <h4>Heat Rises</h4>
+                    <p>The insulated combustion chamber forces fire up, burning excess smoke gases.</p>
+                  </div>
+                </div>
+                <div className="step-card">
+                  <div className="step-number">04</div>
+                  <div className="step-info">
+                    <h4>Efficient Cooking</h4>
+                    <p>Concentrated high-velocity heat hits the cooking surface directly.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Why Choose Us Section */}
+        <section id="why-choose-us" className="benefits-section">
+          <div className="section-header-light">
+            <h2>Better for You. Better for Nature.</h2>
+            <p>Designed to outlast the harshest environments while protecting the planet.</p>
+          </div>
+          
+          <div className="benefits-grid">
+            <div className="benefit-card">
+              <div className="benefit-icon"><i className="fa-solid fa-heart-pulse"></i></div>
+              <h4>Healthier Cooking</h4>
+              <p>Significantly reduces toxic smoke inhalation compared to traditional fires.</p>
+            </div>
+            <div className="benefit-card">
+              <div className="benefit-icon"><i className="fa-solid fa-piggy-bank"></i></div>
+              <h4>Saves Money</h4>
+              <p>Uses up to 80% less fuel, paying for itself in a matter of months.</p>
+            </div>
+            <div className="benefit-card">
+              <div className="benefit-icon"><i className="fa-solid fa-leaf"></i></div>
+              <h4>Environment Friendly</h4>
+              <p>Lower carbon footprint and reduced deforestation through massive efficiency.</p>
+            </div>
+            <div className="benefit-card">
+              <div className="benefit-icon"><i className="fa-solid fa-hammer"></i></div>
+              <h4>Durable & Long Lasting</h4>
+              <p>Industrial-grade materials built for intense continuous heat.</p>
             </div>
           </div>
         </section>
 
         {/* Product Section */}
         <section id="product" className="products-section">
-          <div className="section-header">
-            <h2>Our Premium Products</h2>
-            <p>Curated excellence for the modern professional</p>
+          <div className="section-header" style={{ justifyContent: 'center', textAlign: 'center', borderBottom: 'none', marginBottom: '2.5rem' }}>
+            <h2 style={{ 
+              fontFamily: "'Syne', 'Inter', sans-serif", 
+              letterSpacing: '2px', 
+              fontWeight: 800, 
+              fontSize: '3.6rem', 
+              textTransform: 'uppercase', 
+              background: 'linear-gradient(135deg, var(--accent-yellow) 0%, #4ade80 100%)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              textAlign: 'center',
+              textShadow: '0 4px 20px rgba(74, 222, 128, 0.15)'
+            }}>
+              PRODUCTS
+            </h2>
           </div>
 
+          <div className="category-bar-wrapper" style={{ marginBottom: '2rem' }}>
+            <div className="category-bar-container">
+              {categoryItems.map(cat => {
+                const slug = getCategorySlug(cat);
+                const displayName = getCategoryDisplayName(cat);
+                let iconClass = 'fa-boxes-stacked';
+                if (slug.includes('stove')) iconClass = 'fa-fire';
+                else if (slug.includes('appliances')) iconClass = 'fa-home';
+                else if (slug.includes('welding')) iconClass = 'fa-bolt';
+                else if (slug.includes('engraining') || slug.includes('engraver')) iconClass = 'fa-gears';
 
+                const buttonKey = slug || displayName;
+                return (
+                  <button 
+                    key={buttonKey}
+                    className={`category-bar-item ${selectedCategory === slug ? 'active' : ''}`}
+                    onClick={() => {
+                      handleCategoryChange(slug);
+                      const el = document.getElementById('product');
+                      if (el) el.scrollIntoView({ behavior: 'smooth' });
+                    }}
+                  >
+                    <i className={`fa-solid ${iconClass}`}></i>
+                    <span>{displayName}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
 
           <div className="product-grid">
             {filteredProducts.length > 0 ? (
@@ -2323,126 +2855,62 @@ function App() {
           </div>
         </section>
 
-        {/* New Arrival Section */}
-        <section id="new-arrival" className="products-section" style={{ background: '#f8fafc', marginTop: '0' }}>
-          <div className="section-header">
-            <h2>New Arrivals</h2>
-            <p>The latest additions to our premium collection</p>
+
+        {/* Testimonials Section */}
+        <section className="testimonials-section">
+          <div className="section-header-dark">
+            <h2>Trusted by Professionals</h2>
+            <p>See what our early adopters are saying about the Sri Tech difference.</p>
           </div>
-
-          <div className="product-grid">
-            {products.filter(p => p.isNewArrival).length > 0 ? (
-              products.filter(p => p.isNewArrival).map(product => (
-                <article key={product.id || product._id} className="product-card" style={{ animation: 'fadeIn 0.5s ease forwards' }}>
-                  <button 
-                    className={`like-btn ${waitlist.includes(product.id || product._id) ? 'active' : ''}`} 
-                    onClick={() => handleToggleWaitlist(product.id || product._id)}
-                    aria-label={waitlist.includes(product.id || product._id) ? "Remove from waitlist" : "Add to wishlist"}
-                  >
-                    <i className={`fa-${waitlist.includes(product.id || product._id) ? 'solid' : 'regular'} fa-heart`} aria-hidden="true"></i>
-                  </button>
-
-                  <div className="product-img" onClick={() => { setSelectedProduct(product); setSelectedProductImageIndex(0); }} style={{ cursor: 'pointer' }}>
-                    {product.images && product.images.length > 0 ? (
-                      <img 
-                        src={product.images[0]} 
-                        alt={`New Arrival: ${product.name}`} 
-                        className="hover-zoom"
-                        loading="lazy"
-                      />
-                    ) : (
-                      <i className={`fa-solid ${product.icon || 'fa-box'} placeholder-img`} aria-hidden="true"></i>
-                    )}
-                    <span className="new-badge" style={{ position: 'absolute', top: '10px', left: '10px', background: 'var(--primary-color)', color: 'white', padding: '4px 12px', borderRadius: '20px', fontSize: '0.7rem', fontWeight: 'bold' }}>NEW</span>
-                  </div>
-
-                  <div className="product-info">
-                    <h3 onClick={() => { setSelectedProduct(product); setSelectedProductImageIndex(0); }} style={{ cursor: 'pointer' }}>{product.name}</h3>
-                    
-                    {/* Rating badge */}
-                    {(() => {
-                      const charSum = (product._id || product.id || '').split('').reduce((sum, char) => sum + char.charCodeAt(0), 0);
-                      const rating = (4.1 + (charSum % 8) / 10).toFixed(1);
-                      const reviewsCount = 12 + (charSum % 340);
-                      return (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <span className="rating-badge">{rating} <i className="fa-solid fa-star"></i></span>
-                          <span className="rating-count">({reviewsCount})</span>
-                        </div>
-                      );
-                    })()}
-
-                    {/* Price section */}
-                    {(() => {
-                      const priceNum = parsePrice(product.price);
-                      const activeCoupon = coupons.find(c => 
-                        c.isActive && 
-                        c.linkedProduct === (product._id || product.id) &&
-                        (!c.expiryDate || new Date(c.expiryDate) > new Date())
-                      );
-                      
-                      if (activeCoupon) {
-                        const discountVal = parseFloat(activeCoupon.discountValue) || 0;
-                        let discountedPrice;
-                        let discountText;
-                        if (activeCoupon.discountType === 'Fixed') {
-                          discountedPrice = Math.max(0, priceNum - discountVal);
-                          discountText = `₹${discountVal} off`;
-                        } else {
-                          discountedPrice = Math.round(priceNum * (1 - discountVal / 100));
-                          discountText = `${discountVal}% off`;
-                        }
-                        return (
-                          <div className="price-row">
-                            <span className="price">₹{discountedPrice.toLocaleString('en-IN')}</span>
-                            <span className="original-price">₹{priceNum.toLocaleString('en-IN')}</span>
-                            <span className="discount" style={{ color: '#388e3c', fontWeight: 700 }}>{discountText}</span>
-                          </div>
-                        );
-                      }
-                      
-                      const originalPrice = Math.round(priceNum * 1.35);
-                      return (
-                        <div className="price-row">
-                          <span className="price">₹{priceNum.toLocaleString('en-IN')}</span>
-                          <span className="original-price">₹{originalPrice.toLocaleString('en-IN')}</span>
-                          <span className="discount">26% off</span>
-                        </div>
-                      );
-                    })()}
-
-                    {/* Assured seal */}
-                    <div className="assured-badge-container">
-                      <span className="assured-tag">SriTech <span>Assured <i className="fa-solid fa-shield-halved" style={{ fontSize: '0.6rem' }}></i></span></span>
-                      <span className="free-delivery-tag">Free delivery</span>
-                    </div>
-
-                    <div className="product-actions">
-                      <button className="add-to-cart" onClick={() => handleAddToCart(product)} aria-label={`Add ${product.name} to cart`}>Cart</button>
-                      <button className="buy-now-btn" onClick={() => handleBuyNow(product)} aria-label={`Buy ${product.name} now`}>Buy</button>
-                    </div>
-                  </div>
-                </article>
-              ))
-            ) : (
-              <div className="empty-state glass-card" style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '4rem' }}>
-                <i className="fa-solid fa-clock-rotate-left" style={{ fontSize: '3rem', color: 'var(--primary-color)', opacity: 0.2, marginBottom: '1.5rem', display: 'block' }}></i>
-                <h3 style={{ color: 'var(--primary-color)', marginBottom: '0.5rem' }}>Fresh Arrivals Coming Soon</h3>
-                <p style={{ color: 'var(--text-muted)' }}>We are preparing our latest collection. Stay tuned for exciting new products!</p>
+          
+          <div className="testimonials-grid">
+            <div className="testimonial-card glass-panel">
+              <div className="stars"><i className="fa-solid fa-star"></i><i className="fa-solid fa-star"></i><i className="fa-solid fa-star"></i><i className="fa-solid fa-star"></i><i className="fa-solid fa-star"></i></div>
+              <p className="review-text">"The heat output is incredible. We use 80% less wood than our traditional open fire setup. Truly a game changer for our catering business."</p>
+              <div className="reviewer">
+                <div className="reviewer-avatar">RA</div>
+                <div>
+                  <h4>Rajesh A.</h4>
+                  <p>Commercial Caterer</p>
+                </div>
               </div>
-            )}
+            </div>
+            
+            <div className="testimonial-card glass-panel">
+              <div className="stars"><i className="fa-solid fa-star"></i><i className="fa-solid fa-star"></i><i className="fa-solid fa-star"></i><i className="fa-solid fa-star"></i><i className="fa-solid fa-star"></i></div>
+              <p className="review-text">"Zero smoke once it gets going. It's built like a tank and the stainless steel finish looks premium in our outdoor kitchen."</p>
+              <div className="reviewer">
+                <div className="reviewer-avatar">SM</div>
+                <div>
+                  <h4>Sarah M.</h4>
+                  <p>Eco-Resort Owner</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="testimonial-card glass-panel">
+              <div className="stars"><i className="fa-solid fa-star"></i><i className="fa-solid fa-star"></i><i className="fa-solid fa-star"></i><i className="fa-solid fa-star"></i><i className="fa-solid fa-star-half-stroke"></i></div>
+              <p className="review-text">"I was skeptical about the fuel savings, but the airflow design is pure genius. Boiling water takes a fraction of the time now."</p>
+              <div className="reviewer">
+                <div className="reviewer-avatar">KV</div>
+                <div>
+                  <h4>Karthik V.</h4>
+                  <p>Homestead Enthusiast</p>
+                </div>
+              </div>
+            </div>
           </div>
         </section>
 
       </main>
 
       {/* Footer */}
-      <footer className="footer">
+      <footer id="footer" className="footer">
         <div className="footer-container">
           <div className="footer-details">
             <a href="#" className="footer-logo">The Sri Tech</a>
             <p>11/1, Gurusamipalayam, Rasipuram, Tamil Nadu 637403</p>
-            <p>thesmgroups@gmail.com</p>
+            <p>sritechoffical8@gmail.com</p>
             <p>+91 9043340278</p>
             <div className="social-links">
               <a href="https://www.instagram.com/thesritech?utm_source=qr&igsh=MWx6b2F5cGV5cXk4eA==" target="_blank" rel="noopener noreferrer" aria-label="Instagram"><i className="fa-brands fa-instagram" aria-hidden="true"></i></a>
@@ -2453,38 +2921,11 @@ function App() {
 
           <div className="footer-links">
             <h3>Quick Links</h3>
-            <a href="#home" onClick={(e) => scrollToSection(e, 'home')}>Home</a>
-            <a href="#product" onClick={(e) => scrollToSection(e, 'product')}>Products</a>
-            <a href="#new-arrival" onClick={(e) => scrollToSection(e, 'new-arrival')}>New Arrivals</a>
+            <a href="#home" onClick={(e) => { e.preventDefault(); window.scrollTo({ top: 0, behavior: 'smooth' }); }}>Home</a>
+            <a href="#product" onClick={(e) => { e.preventDefault(); const el = document.getElementById('product'); if(el) el.scrollIntoView({ behavior: 'smooth' }); }}>Products</a>
             <a href="#" onClick={(e) => { e.preventDefault(); setShowComplaintModal(true); }}>Raise a Complaint</a>
           </div>
 
-          <div className="complaint-box">
-            <h3>Subscribe for Updates</h3>
-            <p style={{ marginBottom: '1rem', fontSize: '0.9rem', color: '#a1a1aa' }}>
-              Get notified via email when new products are added.
-            </p>
-            <form id="subscribeForm" onSubmit={async (e) => { 
-              e.preventDefault(); 
-              const email = e.target.querySelector('input').value;
-              try {
-                const res = await fetch(`${API_URL}/subscribers`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ email })
-                });
-                if (res.ok) showToast('Successfully subscribed to our newsletter!', 'success');
-                else showToast('Already subscribed or invalid email.', 'error');
-              } catch (err) {
-                console.error("Subscription error:", err);
-                showToast('Error subscribing. Please try again.', 'error');
-              }
-              e.target.reset();
-            }}>
-              <input type="email" placeholder="Your Email Address" required aria-label="Email for Newsletter" />
-              <button type="submit" className="submit-btn">Subscribe</button>
-            </form>
-          </div>
         </div>
         <div className="footer-bottom">
           <p>&copy; 2026 The Sri Tech. All rights reserved.</p>

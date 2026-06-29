@@ -6,12 +6,15 @@
   "scripts": {
     "server": "npm start --prefix Backend",
     "client": "npm run dev --prefix Frontend",
+    "frontend": "npm run dev --prefix Frontend",
     "dev": "concurrently \"npm run server\" \"npm run client\""
   },
   "devDependencies": {
     "concurrently": "^8.2.2"
   },
   "dependencies": {
+    "mongodb": "^7.3.0",
+    "morgan": "^1.11.0",
     "node-fetch": "^2.7.0"
   }
 }

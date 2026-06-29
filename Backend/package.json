@@ -1,22 +1,47 @@
 {
-  "name": "backend",
+  "name": "sritech-backend",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node server.js"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "description": "Production-ready e-commerce backend for SriTech.",
+  "main": "server.js",
   "type": "commonjs",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js",
+    "normalize-products": "node normalize_products.js",
+    "import-products": "node import_products.js",
+    "lint": "eslint ."
+  },
+  "keywords": [
+    "ecommerce",
+    "node",
+    "express",
+    "mongodb",
+    "razorpay",
+    "cloudinary"
+  ],
+  "author": "SriTech",
+  "license": "MIT",
   "dependencies": {
-    "body-parser": "^2.2.2",
+    "bcryptjs": "^2.4.3",
+    "cloudinary": "^1.36.0",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
+    "express-rate-limit": "^7.0.0",
+    "express-validator": "^7.0.1",
+    "helmet": "^7.0.0",
+    "jsonwebtoken": "^9.0.2",
+    "mongodb-memory-server": "^8.12.1",
     "mongoose": "^9.6.2",
-    "nodemailer": "^8.0.7"
+    "morgan": "^1.10.0",
+    "multer": "^1.4.5-lts.1",
+    "nodemailer": "^8.0.7",
+    "razorpay": "^2.2.8",
+    "swagger-jsdoc": "^6.2.8",
+    "swagger-ui-express": "^5.0.1"
+  },
+  "devDependencies": {
+    "eslint": "^8.57.0",
+    "nodemon": "^3.0.1"
   }
 }

@@ -49,6 +49,7 @@ const AdminDashboard = ({
   });
   
   const [editingCouponId, setEditingCouponId] = useState(null);
+  const [isImageProcessing, setIsImageProcessing] = useState(false);
 
   const formatExipryDate = (dateStr) => {
     if (!dateStr) return '';
@@ -86,7 +87,10 @@ const AdminDashboard = ({
   const [newProduct, setNewProduct] = useState({ 
     name: '', 
     price: '', 
-    category: categories[0] || 'engraining-products', 
+    description: '',
+    specifications: '',
+    stock: 0,
+    category: categories[0]?.slug || categories[0]?.name || 'engraining-products', 
     icon: 'fa-box',
     isNewArrival: false,
     images: [] 
@@ -95,18 +99,23 @@ const AdminDashboard = ({
   // --- Edit Product State ---
   const [editingProductId, setEditingProductId] = useState(null);
   const [editProduct, setEditProduct] = useState({
-    name: '', price: '', category: '', isNewArrival: false, images: []
+    name: '', price: '', description: '', specifications: '', stock: 0, category: '', isNewArrival: false, images: []
   });
+  const [replaceEditImages, setReplaceEditImages] = useState(false);
 
   const startEditProduct = (p) => {
     setEditingProductId(p._id || p.id);
     setEditProduct({
       name: p.name || '',
       price: p.price ? p.price.toString().replace(/[₹,]/g, '') : '',
-      category: p.category || (categories[0] || ''),
+      description: p.description || '',
+      specifications: p.specifications || '',
+      stock: typeof p.stock === 'number' ? p.stock : 0,
+      category: p.category || categories[0]?.slug || categories[0]?.name || '',
       isNewArrival: p.isNewArrival || false,
       images: p.images || []
     });
+    setReplaceEditImages(false);
     // Scroll to top of products section
     setTimeout(() => document.getElementById('edit-product-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
   };
@@ -114,21 +123,36 @@ const AdminDashboard = ({
   const cancelEditProduct = () => {
     setEditingProductId(null);
     setEditProduct({ name: '', price: '', category: '', isNewArrival: false, images: [] });
+    setReplaceEditImages(false);
   };
 
   const handleEditFileChange = (e) => {
     const files = Array.from(e.target.files);
-    if (files.length + editProduct.images.length > 5) {
+    if (!files.length) return;
+    if (files.length > 5) {
       alert('Maximum 5 images allowed per product.');
       return;
     }
-    files.forEach(file => {
+
+    const maxAllowed = replaceEditImages ? 5 : 5 - editProduct.images.length;
+    if (files.length > maxAllowed) {
+      alert('Maximum 5 images allowed per product.');
+      return;
+    }
+
+    setIsImageProcessing(true);
+    const fileReaders = files.map(file => new Promise((resolve) => {
       const reader = new FileReader();
-      reader.onloadend = () => {
-        setEditProduct(prev => ({ ...prev, images: [...prev.images, reader.result] }));
-      };
+      reader.onloadend = () => resolve(reader.result);
       reader.readAsDataURL(file);
-    });
+    }));
+
+    Promise.all(fileReaders).then(results => {
+      setEditProduct(prev => ({
+        ...prev,
+        images: replaceEditImages ? results : [...prev.images, ...results]
+      }));
+    }).finally(() => setIsImageProcessing(false));
   };
 
   const removeEditImage = (index) => {
@@ -137,7 +161,26 @@ const AdminDashboard = ({
 
   const handleUpdateProduct = async (e) => {
     e.preventDefault();
-    await onUpdateProduct(editingProductId, editProduct);
+    if (!editProduct.name || !editProduct.price || !editProduct.category || !editProduct.description) {
+      alert('Please fill in all required fields before saving.');
+      return;
+    }
+    if (isImageProcessing) {
+      alert('Please wait while the new images are being prepared.');
+      return;
+    }
+
+    const payload = {
+      ...editProduct,
+      images: (Array.isArray(editProduct.images) ? editProduct.images : []).map((img) => {
+        if (typeof img !== 'string' || !img) return img;
+        if (img.startsWith('data:')) return img;
+        const separator = img.includes('?') ? '&' : '?';
+        return `${img}${separator}t=${Date.now()}`;
+      })
+    };
+
+    await onUpdateProduct(editingProductId, payload);
     cancelEditProduct();
   };
 
@@ -161,18 +204,39 @@ const AdminDashboard = ({
 
   const handleAddProduct = (e) => {
     e.preventDefault();
-    onAddProduct(newProduct);
+    if (!newProduct.name || !newProduct.price || !newProduct.category || !newProduct.description) {
+      alert('Please fill in all required fields before saving.');
+      return;
+    }
+    if (isImageProcessing) {
+      alert('Please wait while the new images are being prepared.');
+      return;
+    }
+
+    const payload = {
+      ...newProduct,
+      images: (Array.isArray(newProduct.images) ? newProduct.images : []).map((img) => {
+        if (typeof img !== 'string' || !img) return img;
+        if (img.startsWith('data:')) return img;
+        const separator = img.includes('?') ? '&' : '?';
+        return `${img}${separator}t=${Date.now()}`;
+      })
+    };
+
+    onAddProduct(payload);
     alert('Product added successfully!');
-    setNewProduct({ name: '', price: '', category: categories[0] || 'engraining-products', icon: 'fa-box', isNewArrival: false, images: [] });
+    setNewProduct({ name: '', price: '', description: '', specifications: '', stock: 0, category: categories[0]?.slug || categories[0]?.name || 'stoves', icon: 'fa-box', isNewArrival: false, images: [] });
   };
 
   const handleFileChange = (e) => {
     const files = Array.from(e.target.files);
+    if (!files.length) return;
     if (files.length + newProduct.images.length > 5) {
       alert('Maximum 5 images allowed per product.');
       return;
     }
 
+    setIsImageProcessing(true);
     files.forEach(file => {
       const reader = new FileReader();
       reader.onloadend = () => {
@@ -183,6 +247,8 @@ const AdminDashboard = ({
       };
       reader.readAsDataURL(file);
     });
+
+    setTimeout(() => setIsImageProcessing(false), 500);
   };
 
   const removeImage = (index) => {
@@ -211,7 +277,7 @@ const AdminDashboard = ({
     e.preventDefault();
     if (!newCategory.trim()) return;
     const slug = newCategory.toLowerCase().trim().replace(/\s+/g, '-');
-    if (categories.includes(slug)) {
+    if (categories.some(cat => (cat.slug || cat.name || '').toLowerCase() === slug.toLowerCase())) {
       alert('Category already exists!');
       return;
     }
@@ -312,7 +378,7 @@ const AdminDashboard = ({
               <span className="admin-role">CEO & Super Admin</span>
             </div>
             <div className="admin-avatar">
-              <img src="/logo.png" alt="SriTech Logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+              <img src="/sri-tech-logo-final.png" alt="SriTech Logo" style={{ width: '100%', height: '100%', objectFit: 'contain', background: 'transparent' }} />
             </div>
           </div>
         </header>
@@ -455,16 +521,48 @@ const AdminDashboard = ({
                         </div>
                       </div>
                       <div className="admin-form-group">
+                        <label>Description</label>
+                        <textarea
+                          placeholder="Short product description"
+                          value={editProduct.description}
+                          onChange={(e) => setEditProduct({ ...editProduct, description: e.target.value })}
+                          style={{ minHeight: '100px' }}
+                        />
+                      </div>
+                      <div className="admin-form-group">
+                        <label>Specifications</label>
+                        <textarea
+                          placeholder="Product specifications"
+                          value={editProduct.specifications}
+                          onChange={(e) => setEditProduct({ ...editProduct, specifications: e.target.value })}
+                          style={{ minHeight: '100px' }}
+                        />
+                      </div>
+                      <div className="admin-form-group">
+                        <label>Stock</label>
+                        <input
+                          type="number"
+                          min="0"
+                          placeholder="Stock quantity"
+                          value={editProduct.stock}
+                          onChange={(e) => setEditProduct({ ...editProduct, stock: Number(e.target.value) })}
+                        />
+                      </div>
+                      <div className="admin-form-group">
                         <label>Category</label>
                         <select
                           value={editProduct.category}
                           onChange={(e) => setEditProduct({ ...editProduct, category: e.target.value })}
                         >
-                          {categories.map(cat => (
-                            <option key={cat} value={cat}>
-                              {cat.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
-                            </option>
-                          ))}
+                          {categories.map(cat => {
+                            const value = typeof cat === 'string' ? cat : (cat.slug || cat.name || '').toString();
+                            const label = typeof cat === 'string' ? cat : (cat.name || cat.slug || '').toString();
+                            return (
+                              <option key={value} value={value}>
+                                {label.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
+                              </option>
+                            );
+                          })}
                         </select>
                       </div>
                       <div className="admin-form-group" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '0.5rem', marginTop: '1.8rem' }}>
@@ -481,26 +579,40 @@ const AdminDashboard = ({
 
                     <div className="admin-form-group" style={{ marginBottom: '1.5rem' }}>
                       <label>Product Images (Max 5)</label>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', marginTop: '0.5rem' }}>
-                        {editProduct.images.map((src, index) => (
-                          <div key={index} style={{ position: 'relative', width: '80px', height: '80px', borderRadius: '8px', overflow: 'hidden', border: '2px solid var(--primary-light)' }}>
-                            <img src={src} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                            <button
-                              type="button"
-                              onClick={() => removeEditImage(index)}
-                              style={{ position: 'absolute', top: '2px', right: '2px', background: '#ef4444', color: 'white', border: 'none', borderRadius: '50%', width: '18px', height: '18px', fontSize: '10px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                            >
-                              &times;
-                            </button>
-                          </div>
-                        ))}
-                        {editProduct.images.length < 5 && (
-                          <label style={{ width: '80px', height: '80px', borderRadius: '8px', border: '2px dashed var(--primary-light)', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', cursor: 'pointer' }}>
-                            <i className="fa-solid fa-plus" style={{ color: 'var(--primary-color)', fontSize: '1.2rem' }}></i>
-                            <span style={{ fontSize: '0.65rem', color: 'var(--primary-color)', marginTop: '4px' }}>Add Image</span>
-                            <input type="file" accept="image/*" multiple onChange={handleEditFileChange} style={{ display: 'none' }} />
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '0.5rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                          <input
+                            type="checkbox"
+                            id="replaceEditImages"
+                            checked={replaceEditImages}
+                            onChange={(e) => setReplaceEditImages(e.target.checked)}
+                            style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                          />
+                          <label htmlFor="replaceEditImages" style={{ cursor: 'pointer', fontSize: '0.95rem' }}>
+                            Replace existing images with uploaded files
                           </label>
-                        )}
+                        </div>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem' }}>
+                          {editProduct.images.map((src, index) => (
+                            <div key={index} style={{ position: 'relative', width: '80px', height: '80px', borderRadius: '8px', overflow: 'hidden', border: '2px solid var(--primary-light)' }}>
+                              <img src={src} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                              <button
+                                type="button"
+                                onClick={() => removeEditImage(index)}
+                                style={{ position: 'absolute', top: '2px', right: '2px', background: '#ef4444', color: 'white', border: 'none', borderRadius: '50%', width: '18px', height: '18px', fontSize: '10px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                              >
+                                &times;
+                              </button>
+                            </div>
+                          ))}
+                          {(replaceEditImages || editProduct.images.length < 5) && (
+                            <label style={{ width: '80px', height: '80px', borderRadius: '8px', border: '2px dashed var(--primary-light)', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', cursor: 'pointer' }}>
+                              <i className="fa-solid fa-plus" style={{ color: 'var(--primary-color)', fontSize: '1.2rem' }}></i>
+                              <span style={{ fontSize: '0.65rem', color: 'var(--primary-color)', marginTop: '4px' }}>Upload Images</span>
+                              <input type="file" accept="image/*" multiple onChange={handleEditFileChange} style={{ display: 'none' }} />
+                            </label>
+                          )}
+                        </div>
                       </div>
                     </div>
 
@@ -541,21 +653,52 @@ const AdminDashboard = ({
                         />
                       </div>
                     </div>
-
+                    <div className="admin-form-group">
+                      <label>Description</label>
+                      <textarea
+                        placeholder="Short product description"
+                        required
+                        value={newProduct.description}
+                        onChange={(e) => setNewProduct({...newProduct, description: e.target.value})}
+                        style={{ minHeight: '100px' }}
+                      />
+                    </div>
+                    <div className="admin-form-group">
+                      <label>Specifications</label>
+                      <textarea
+                        placeholder="Product specifications"
+                        value={newProduct.specifications}
+                        onChange={(e) => setNewProduct({...newProduct, specifications: e.target.value})}
+                        style={{ minHeight: '100px' }}
+                      />
+                    </div>
+                    <div className="admin-form-group">
+                      <label>Stock</label>
+                      <input
+                        type="number"
+                        min="0"
+                        placeholder="Stock quantity"
+                        value={newProduct.stock}
+                        onChange={(e) => setNewProduct({...newProduct, stock: Number(e.target.value)})}
+                      />
+                    </div>
                     <div className="admin-form-group">
                       <label>Category</label>
                       <select 
                         value={newProduct.category}
                         onChange={(e) => setNewProduct({...newProduct, category: e.target.value})}
                       >
-                        {categories.map(cat => (
-                          <option key={cat} value={cat}>
-                            {cat.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
-                          </option>
-                        ))}
+                        {categories.map(cat => {
+                          const optionValue = typeof cat === 'string' ? cat : (cat.slug || cat.name || '').toString();
+                          const optionLabel = typeof cat === 'string' ? cat : (cat.name || cat.slug || '').toString();
+                          return (
+                            <option key={optionValue} value={optionValue}>
+                              {optionLabel.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
+                            </option>
+                          );
+                        })}
                       </select>
                     </div>
-
                     <div className="admin-form-group" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: '0.5rem', marginTop: '1.8rem' }}>
                       <input 
                         type="checkbox" 
