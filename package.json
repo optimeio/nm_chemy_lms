@@ -1,0 +1,7 @@
+{
+  "name": "nm_chemy_lms",
+  "private": true,
+  "scripts": {
+    "dev": "powershell -NoExit -Command \"& { Start-Process powershell -ArgumentList '-NoExit','-Command','cd \"./backend\"; npm run dev' -WindowStyle Normal; Start-Process powershell -ArgumentList '-NoExit','-Command','cd \"./frontend\"; npm run dev' -WindowStyle Normal }\""
+  }
+}
