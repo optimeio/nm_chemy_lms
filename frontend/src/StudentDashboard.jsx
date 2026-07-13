@@ -316,12 +316,12 @@ export default function StudentDashboard() {
               </div>
             </div>
             <button style={{
-              padding: '8px 24px',
+              padding: '5px 14px',
               background: '#2563EB',
               color: 'white',
               border: 'none',
-              borderRadius: 8,
-              fontSize: 13,
+              borderRadius: 7,
+              fontSize: 11,
               fontWeight: 600,
               cursor: 'pointer',
               whiteSpace: 'nowrap',
