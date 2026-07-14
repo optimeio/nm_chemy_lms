@@ -25,7 +25,7 @@ const MENU_ITEMS = [
 export default function StudentDashboard() {
   const navigate = useNavigate();
   const location = useLocation();
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [userInitial, setUserInitial] = useState('D');
   const [studentData, setStudentData] = useState({
@@ -116,34 +116,46 @@ export default function StudentDashboard() {
     } else {
       navigate(`/dashboard/student/${menuId}`);
     }
+    if (isMobile) {
+      setSidebarOpen(false);
+    }
   };
 
   const handleHackathonClick = () => {
     navigate('/dashboard/student/hackathon');
+    if (isMobile) {
+      setSidebarOpen(false);
+    }
   };
 
   return (
-    <div style={{ display: 'flex', height: '100vh', background: '#F9FAFB' }}>
-      <div style={{
-        width: sidebarOpen ? 240 : 0,
-        minWidth: sidebarOpen ? 240 : 0,
-        background: 'white',
-        borderRight: sidebarOpen ? '1px solid #E5E7EB' : 'none',
-        transition: 'width 0.3s, min-width 0.3s',
-        overflow: 'hidden',
-        display: 'flex',
-        flexDirection: 'column',
-        position: isMobile ? 'absolute' : 'relative',
-        zIndex: isMobile ? 20 : 'auto',
-        height: isMobile ? '100vh' : 'auto',
-      }}>
-        <div style={{ padding: '20px', borderBottom: '1px solid #E5E7EB' }}>
-          <BrandLogo size="sm" />
+    <div className="min-h-screen w-full flex bg-white overflow-x-hidden">
+      {sidebarOpen && isMobile && (
+        <button
+          type="button"
+          className="fixed inset-0 z-30 bg-black/40 md:hidden"
+          onClick={() => setSidebarOpen(false)}
+          aria-label="Close sidebar overlay"
+        />
+      )}
+
+      <aside className={`fixed z-40 inset-y-0 left-0 w-72 max-w-[80vw] bg-white border-r border-gray-200 flex flex-col transition-transform duration-300 ease-in-out md:static md:translate-x-0 md:w-64 md:max-w-none ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+        <div className="flex items-center justify-between px-5 h-16 border-b border-gray-200">
+          <div className="flex items-center gap-2">
+            <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-[#0B3D91] to-indigo-500" />
+            <div>
+              <div className="text-gray-900 text-lg font-semibold tracking-wide" style={{ fontFamily: "'Playfair Display', serif" }}>
+                Chemy
+              </div>
+              <div className="text-xs text-gray-500 uppercase tracking-[0.24em] mt-0.5">Student Panel</div>
+            </div>
+          </div>
+          <button className="md:hidden text-gray-500 hover:text-gray-900" onClick={() => setSidebarOpen(false)}>
+            <X size={20} />
+          </button>
         </div>
 
-        <div style={{ padding: '16px 20px 12px', fontSize: 12, fontWeight: 600, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-          Main Menu
-        </div>
+        <div className="px-5 pt-4 pb-2 text-[11px] tracking-widest text-gray-500 uppercase">Main Menu</div>
 
         <nav style={{ flex: 1, overflowY: 'auto' }}>
           {MENU_ITEMS.map((item) => {
@@ -162,9 +174,9 @@ export default function StudentDashboard() {
                   alignItems: 'center',
                   gap: 12,
                   border: 'none',
-                  background: active ? '#FFFFFF' : 'transparent',
+                  background: active ? '#EFF6FF' : 'transparent',
                   cursor: 'pointer',
-                  color: active ? '#1D4ED8' : '#6B7280',
+                  color: active ? '#0B3D91' : '#6B7280',
                   fontSize: 14,
                   fontWeight: active ? 600 : 500,
                   transition: 'all 0.15s',
@@ -174,7 +186,7 @@ export default function StudentDashboard() {
                   paddingLeft: 8,
                 }}
               >
-                <div style={{ width: 6, height: 36, background: active ? '#2563EB' : 'transparent', borderRadius: 6, marginRight: 8 }} />
+                <div style={{ width: 6, height: 36, background: active ? '#0B3D91' : 'transparent', borderRadius: 6, marginRight: 8 }} />
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                   <div style={{
@@ -185,7 +197,7 @@ export default function StudentDashboard() {
                     justifyContent: 'center',
                     borderRadius: 10,
                     background: active ? '#EFF6FF' : '#F3F4F6',
-                    color: active ? '#2563EB' : '#6B7280',
+                    color: active ? '#0B3D91' : '#6B7280',
                     flexShrink: 0,
                   }}>
                     <Icon size={18} />
@@ -215,54 +227,101 @@ export default function StudentDashboard() {
               borderRadius: 6,
               transition: 'all 0.2s',
             }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = '#FEE2E2';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'transparent';
-            }}
           >
             <LogOut size={20} />
             Sign Out
           </button>
         </div>
-      </div>
+      </aside>
 
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', marginLeft: isMobile && sidebarOpen ? 240 : 0 }}>
-        <div style={{
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={isMobile ? {
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '20px',
+          gap: 14,
+          background: 'linear-gradient(180deg, rgba(255,255,255,0.92) 0%, rgba(244,245,247,0.92) 100%)',
+          borderBottomLeftRadius: 24,
+          borderBottomRightRadius: 24,
+          borderBottom: '1px solid rgba(148,163,184,0.18)',
+          boxShadow: '0 20px 45px rgba(15, 23, 42, 0.08)',
+          backdropFilter: 'blur(16px)',
+          WebkitBackdropFilter: 'blur(16px)',
+          color: '#0F172A',
+        } : {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
           flexWrap: 'wrap',
-          padding: isMobile ? '16px' : '16px 32px',
-          background: 'white',
+          padding: '16px 24px',
+          background: '#ffffff',
           borderBottom: '1px solid #E5E7EB',
+          color: '#0B1224',
         }}>
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
             style={{
-              background: 'none',
-              border: 'none',
+              background: 'rgba(15, 23, 42, 0.04)',
+              border: '1px solid rgba(15, 23, 42, 0.08)',
+              width: 44,
+              height: 44,
+              borderRadius: 16,
+              display: isMobile ? 'inline-flex' : 'none',
+              alignItems: 'center',
+              justifyContent: 'center',
               cursor: 'pointer',
-              color: '#6B7280',
+              color: '#0F172A',
+              boxShadow: '0 10px 24px rgba(15, 23, 42, 0.08)',
             }}
+            aria-label={sidebarOpen ? 'Close menu' : 'Open menu'}
           >
-            {sidebarOpen ? <X size={24} /> : <Menu size={24} />}
+            {sidebarOpen ? <X size={22} /> : <Menu size={22} />}
           </button>
-          <div style={{
-            width: 40,
-            height: 40,
-            background: '#EC4899',
-            borderRadius: '50%',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: 'white',
-            fontWeight: 'bold',
-            fontSize: 16,
-            marginTop: isMobile ? 8 : 0,
-          }}>
-            {userInitial}
+
+          <div style={{ flex: 1, minWidth: 0 }} />
+
+          <button
+            type="button"
+            style={{
+              position: 'relative',
+              width: 44,
+              height: 44,
+              borderRadius: 16,
+              border: '1px solid rgba(15, 23, 42, 0.08)',
+              background: 'rgba(255,255,255,0.75)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              color: '#0F172A',
+              boxShadow: '0 10px 24px rgba(15, 23, 42, 0.08)',
+            }}
+            aria-label="Notifications"
+          >
+            <Bell size={18} />
+            <span style={{
+              position: 'absolute',
+              top: 5,
+              right: 5,
+              width: 16,
+              height: 16,
+              borderRadius: '9999px',
+              background: '#2563EB',
+              color: 'white',
+              fontSize: 10,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontWeight: 700,
+              boxShadow: '0 0 0 4px rgba(37, 99, 235, 0.12)',
+            }}>
+              3
+            </span>
+          </button>
+
+          <div style={{ width: 44, height: 44, borderRadius: 16, background: 'linear-gradient(135deg, #4A6DFF 0%, #2563EB 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 16px 35px rgba(37, 99, 235, 0.18)', cursor: 'pointer' }}>
+            <span style={{ color: 'white', fontWeight: 700, fontSize: 16 }}>{userInitial}</span>
           </div>
         </div>
 

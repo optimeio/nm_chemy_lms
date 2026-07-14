@@ -278,13 +278,13 @@ export default function Hackathon() {
           {displayStats.map((stat, idx) => {
             const Icon = stat.icon || Sparkles;
             return (
-              <div key={idx} className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm flex items-center gap-4 transition hover:shadow-md">
+              <div key={idx} className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm flex items-center gap-4 transition hover:shadow-md min-w-0">
                 <div className={`p-3.5 rounded-xl ${stat.bg} ${stat.color} shrink-0`}>
                   <Icon size={20} />
                 </div>
-                <div>
-                  <p className="text-2xl font-bold tracking-tight text-slate-900">{stat.value}</p>
-                  <p className="text-xs font-semibold text-slate-400 tracking-wider uppercase mt-0.5">{stat.label}</p>
+                <div className="min-w-0">
+                  <p className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 truncate">{stat.value}</p>
+                  <p className="text-xs font-semibold text-slate-400 tracking-wider uppercase mt-0.5 truncate">{stat.label}</p>
                 </div>
               </div>
             );

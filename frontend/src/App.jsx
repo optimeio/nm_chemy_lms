@@ -3,13 +3,15 @@ import { BrowserRouter, Routes, Route, useNavigate } from "react-router-dom";
 import { ArrowRight, Eye, EyeOff } from "lucide-react";
 import SignInLayout from './SignInLayout';
 import StudentDashboard from "./StudentDashboard";
-import AdminDashboard from "./AdminDashboard";
+import AdminPortal from "./pages/AdminPortal";
 import Hackathon from "./pages/Hackathon";
 import Announcement from "./pages/Announcement";
 import Feedback from "./pages/Feedback";
 import Certificates from "./pages/Certificates";
 import UniversityPractical from "./pages/UniversityPractical";
 import Profile from "./pages/Profile";
+
+const API_BASE_URL = import.meta.env.VITE_BACKEND_URL || import.meta.env.BACKEND_URL || 'http://localhost:5000';
 
 function ChemyAuth() {
   const navigate = useNavigate();
@@ -66,7 +68,7 @@ function ChemyAuth() {
     // Clear previous alerts
     setAuthAlert(null);
 
-    fetch('/api/auth/login', {
+    fetch(`${API_BASE_URL}/api/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password }),
@@ -209,7 +211,7 @@ function ChemyAuth() {
 
     setAuthAlert(null);
 
-    fetch('/api/auth/register', {
+    fetch(`${API_BASE_URL}/api/auth/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -406,7 +408,7 @@ export default function App() {
         <Route path="/" element={<ChemyAuth />} />
         <Route path="/login" element={<ChemyAuth />} />
         <Route path="/dashboard/student/*" element={<StudentDashboard />} />
-        <Route path="/dashboard/admin/*" element={<AdminDashboard />} />
+        <Route path="/dashboard/admin/*" element={<AdminPortal />} />
       </Routes>
     </BrowserRouter>
   );

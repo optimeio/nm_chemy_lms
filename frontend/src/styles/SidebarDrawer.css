@@ -1,0 +1,228 @@
+/* Sidebar Drawer Styles */
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background: #f3f4f6;
+}
+
+.app {
+  position: relative;
+  width: 100%;
+  max-width: 100%;
+  height: 100vh;
+  background: #fff;
+  overflow: hidden;
+}
+
+/* top bar */
+.topbar {
+  height: 56px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 16px;
+  border-bottom: 1px solid #eee;
+  background: #fff;
+  position: relative;
+  z-index: 20;
+}
+
+.hamburger {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  border: 1px solid #e5e7eb;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 18px;
+  transition: all 0.2s ease;
+}
+
+.hamburger:hover {
+  background: #f3f4f6;
+}
+
+.topbar .brand {
+  font-weight: 800;
+  color: #111827;
+  font-size: 16px;
+}
+
+/* main content — this must ALWAYS render, sidebar just overlays on top */
+.content {
+  padding: 20px 16px;
+  height: calc(100vh - 56px);
+  overflow-y: auto;
+  position: relative;
+  z-index: 1;
+}
+
+.content h1 {
+  font-size: 22px;
+  margin: 0 0 6px;
+}
+
+.content p {
+  color: #6b7280;
+  font-size: 14px;
+  margin: 0 0 16px;
+}
+
+.hero {
+  background: linear-gradient(135deg, #1e1b4b, #312e81);
+  color: #fff;
+  border-radius: 16px;
+  padding: 20px;
+  margin-bottom: 16px;
+}
+
+.hero .badge {
+  display: inline-block;
+  background: rgba(255, 255, 255, 0.15);
+  font-size: 11px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  margin-bottom: 10px;
+}
+
+.hero h2 {
+  margin: 0 0 8px;
+  font-size: 20px;
+}
+
+.hero p {
+  color: rgba(255, 255, 255, 0.8);
+  margin: 0;
+  font-size: 13.5px;
+}
+
+/* sidebar drawer — overlay, closed by default (translated off-screen) */
+.backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.35);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+  z-index: 5;
+}
+
+.app.open .backdrop {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 260px;
+  background: #fff;
+  border-right: 1px solid #eee;
+  transform: translateX(-100%);
+  transition: transform 0.25s ease;
+  z-index: 10;
+  padding: 20px 16px;
+  overflow-y: auto;
+}
+
+.app.open .sidebar {
+  transform: translateX(0);
+}
+
+.sidebar .brand-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.sidebar .brand {
+  font-weight: 800;
+  color: #111827;
+  font-size: 16px;
+}
+
+.close-btn {
+  border: none;
+  background: none;
+  font-size: 18px;
+  cursor: pointer;
+  color: #9ca3af;
+  padding: 0;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s ease;
+}
+
+.close-btn:hover {
+  color: #6b7280;
+}
+
+.nav-label {
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  color: #9ca3af;
+  margin: 14px 0 8px;
+  text-transform: uppercase;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 10px;
+  border-radius: 10px;
+  font-size: 14px;
+  color: #374151;
+  cursor: pointer;
+  margin-bottom: 2px;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.nav-item:hover {
+  background: #f3f4f6;
+}
+
+.nav-item.active {
+  background: #eef2ff;
+  color: #4338ca;
+  font-weight: 600;
+}
+
+.sign-out {
+  color: #dc2626;
+  margin-top: 16px;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 10px 10px;
+  border-radius: 10px;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.sign-out:hover {
+  background: #fee2e2;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .sidebar {
+    width: 260px;
+  }
+}

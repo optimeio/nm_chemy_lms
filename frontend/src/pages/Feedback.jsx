@@ -20,14 +20,79 @@ export default function Feedback() {
   const [comment, setComment] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [error, setError] = useState("");
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!mood) {
+      setError("Please select a rating");
+      return;
+    }
+
     setSubmitting(true);
+    setError("");
     try {
-      // Replace with your real endpoint, e.g. api.post("/feedback", { mood, comment })
-      await new Promise((res) => setTimeout(res, 800));
+      const API_BASE_URL = import.meta.env.VITE_BACKEND_URL || import.meta.env.BACKEND_URL || 'http://localhost:5000';
+      const token = localStorage.getItem('token');
+      const userEmail = localStorage.getItem('userEmail') || 'Anonymous Student';
+
+      const feedbackData = {
+        student: userEmail,
+        email: userEmail,
+        rating: mood,
+        text: comment,
+        message: comment
+      };
+
+      console.log('=== FEEDBACK SUBMISSION DEBUG ===');
+      console.log('API_BASE_URL:', API_BASE_URL);
+      console.log('Token exists:', !!token);
+      console.log('User Email:', userEmail);
+      console.log('Feedback Data:', feedbackData);
+      console.log('Request URL:', `${API_BASE_URL}/api/announcements/feedback/submit`);
+      console.log('Request Headers:', { 'Content-Type': 'application/json' });
+
+      const response = await fetch(`${API_BASE_URL}/api/announcements/feedback/submit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(feedbackData)
+      });
+
+      console.log('Response Status:', response.status);
+      console.log('Response OK:', response.ok);
+      console.log('Response Headers:', Object.fromEntries(response.headers));
+
+      let responseData;
+      try {
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          responseData = await response.json();
+        } else {
+          const text = await response.text();
+          console.error('❌ Response is not JSON. Content-Type:', contentType);
+          console.error('Response text (first 500 chars):', text.substring(0, 500));
+          throw new Error(`Server returned ${contentType || 'unknown'} instead of JSON`);
+        }
+      } catch (parseErr) {
+        console.error('❌ Failed to parse response:', parseErr.message);
+        throw parseErr;
+      }
+
+      console.log('Response Body:', responseData);
+
+      if (!response.ok) {
+        const errorMessage = responseData?.message || responseData?.error || `HTTP ${response.status}`;
+        console.error('API Error Response:', responseData);
+        throw new Error(`Failed to submit feedback: ${errorMessage}`);
+      }
+
+      console.log('✅ Feedback submitted successfully');
       setSubmitted(true);
+    } catch (err) {
+      const errorMsg = err.message || 'Failed to submit feedback. Please try again.';
+      console.error('❌ Feedback submission error:', errorMsg);
+      console.error('Error details:', err);
+      setError(errorMsg);
     } finally {
       setSubmitting(false);
     }
@@ -77,6 +142,11 @@ export default function Feedback() {
             onSubmit={handleSubmit}
             className="space-y-6 rounded-2xl border border-slate-200 bg-white p-8 shadow-sm"
           >
+            {error && (
+              <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-700 font-semibold">
+                {error}
+              </div>
+            )}
             <div>
               <div className="mb-1 flex items-center gap-2">
                 <SectionBadge>

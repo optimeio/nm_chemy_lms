@@ -1,190 +1,265 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from "react";
+import { Eye, Download, ChevronLeft, ChevronRight, X, FileText, Menu, Bell } from "lucide-react";
+
+const PAGE_SIZE = 5;
+
+// Responsive CSS for mobile-friendly layout
+const styles = `
+.upe-row {
+  display: grid;
+  grid-template-columns: 70px minmax(0,1fr) minmax(0,1fr) minmax(0,1.3fr) auto;
+  align-items: center;
+  gap: 12px;
+  background: #FFFFFF;
+  border: 1px solid #E5E7EB;
+  border-radius: 12px;
+  padding: 14px 16px;
+  transition: border-color 0.15s, background 0.15s;
+}
+.upe-row:hover {
+  border-color: #4F46E5;
+  background: #EEF2FF;
+}
+.upe-day { font-weight: 700; color: #4338CA; font-size: 14px; }
+.upe-actions { display: flex; gap: 8px; flex-shrink: 0; }
+.upe-actions button {
+  display: flex; align-items: center; gap: 6px;
+  padding: 8px 12px; border-radius: 8px; font-size: 12.5px; font-weight: 600;
+  cursor: pointer; white-space: nowrap; border: 1px solid #D1D5DB;
+}
+.upe-view { border: 1px solid #4F46E5; background: #4F46E5; color: #fff; }
+.upe-dl { border: 1px solid #D1D5DB; background: #F3F4F6; color: #374151; }
+.upe-pdf-section { grid-column: 1 / -1; border-top: 1px solid #E5E7EB; margin-top: 4px; padding-top: 12px; }
+.upe-pdf-info { display: flex; align-items: center; gap: 12px; font-size: 12.5px; }
+.upe-pdf-name { display: flex; align-items: center; gap: 8px; }
+.upe-pdf-btn { display: flex; align-items: center; gap: 5px; padding: 6px 12px; border-radius: 7px; border: 1px solid #4F46E5; background: #4F46E5; color: #fff; font-size: 12px; font-weight: 600; cursor: pointer; }
+.upe-no-pdf { font-size: 12.5px; color: #9CA3AF; font-style: italic; }
+
+@media (max-width: 640px) {
+  .upe-row {
+    grid-template-columns: 1fr;
+    gap: 4px;
+    padding: 12px 12px;
+  }
+  .upe-row > div:not(.upe-actions):not(.upe-pdf-section) { padding: 2px 0; }
+  .upe-day { font-weight: 700; color: #4338CA; font-size: 14px; margin-bottom: 2px; }
+  .upe-meta { font-size: 12px; color: #6B7280; margin-bottom: 1px; }
+  .upe-time { word-wrap: break-word; overflow-wrap: break-word; }
+  .upe-actions { width: 100%; margin-top: 8px; gap: 6px; }
+  .upe-actions button { flex: 1; justify-content: center; font-size: 12px; padding: 7px 8px; }
+  .upe-pdf-section { margin-top: 8px; padding-top: 8px; }
+  .upe-pdf-info { flex-direction: column; gap: 8px; }
+  .upe-pdf-name { flex-direction: column; gap: 4px; align-items: flex-start; }
+  .upe-pdf-btn { width: 100%; justify-content: center; font-size: 11px; padding: 6px 10px; }
+}
+`;
+
+function useGoogleFont() {
+  useEffect(() => {
+    const id = "playfair-display-font";
+    if (document.getElementById(id)) return;
+    const link = document.createElement("link");
+    link.id = id;
+    link.rel = "stylesheet";
+    link.href = "https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&display=swap";
+    document.head.appendChild(link);
+  }, []);
+}
 
 export default function UniversityPractical() {
-  const navigate = useNavigate();
-  const [currentPage, setCurrentPage] = useState(1);
+  useGoogleFont();
+  const [page, setPage] = useState(1);
+  const [viewing, setViewing] = useState(null);
+  const [records, setRecords] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const records = [
-    { day: 'Day 1', date: '18 Jul 2026', time: '10:00 AM', venue: 'Lab Block A - 204' },
-    { day: 'Day 2', date: '20 Jul 2026', time: '01:30 PM', venue: 'CS Lab 3' },
-    { day: 'Day 3', date: '22 Jul 2026', time: '09:00 AM', venue: 'Analytics Lab' },
-    { day: 'Day 4', date: '25 Jul 2026', time: '11:00 AM', venue: 'Lab Block B - 101' },
-    { day: 'Day 5', date: '05 Jul 2026', time: '10:00 AM', venue: 'Lab Block A - 204' },
-    { day: 'Day 6', date: '03 Jul 2026', time: '02:00 PM', venue: 'CS Lab 1' },
-    { day: 'Day 7', date: '28 Jun 2026', time: '09:30 AM', venue: 'CS Lab 2' },
-    { day: 'Day 8', date: '27 Jul 2026', time: '10:00 AM', venue: 'AI Research Lab' },
-    { day: 'Day 9', date: '30 Jul 2026', time: '01:00 PM', venue: 'Lab Block A - 301' },
-    { day: 'Day 10', date: '01 Aug 2026', time: '10:30 AM', venue: 'Seminar Hall 2' },
-    { day: 'Day 11', date: '22 Jun 2026', time: '11:00 AM', venue: 'Cloud Lab' },
-    { day: 'Day 12', date: '04 Aug 2026', time: '09:00 AM', venue: 'Lab Block B - 202' },
-  ];
+  // Fetch records on mount
+  useEffect(() => {
+    fetchRecords();
+  }, []);
 
-  const pageSize = 5;
-  const totalPages = Math.ceil(records.length / pageSize);
-  const start = (currentPage - 1) * pageSize;
-  const pageRecords = records.slice(start, start + pageSize);
-
-  const goTo = (page) => {
-    if (page < 1 || page > totalPages) return;
-    setCurrentPage(page);
+  const fetchRecords = async () => {
+    try {
+      setLoading(true);
+      const res = await fetch('/api/university-practical');
+      if (res.ok) {
+        const data = await res.json();
+        setRecords(data);
+      }
+    } catch (err) {
+      console.error('Error fetching records:', err);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const IconBtn = ({ type }) => (
-    <button
-      className="btn-icon inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition"
-      style={
-        type === 'view'
-          ? { color: '#93c5fd', backgroundColor: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.3)' }
-          : { color: '#d1d5db', backgroundColor: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }
-      }
-    >
-      {type === 'view' ? (
-        <>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8Z" />
-            <circle cx="12" cy="12" r="3" />
-          </svg>
-          View
-        </>
-      ) : (
-        <>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" />
-          </svg>
-          Download
-        </>
-      )}
-    </button>
-  );
+  const totalPages = Math.ceil(records.length / PAGE_SIZE);
+  const start = (page - 1) * PAGE_SIZE;
+  const pageRecords = records.slice(start, start + PAGE_SIZE);
+
+  const goTo = (p) => setPage(Math.min(Math.max(p, 1), totalPages));
+
+  const formatSize = (bytes) => {
+    if (!bytes) return "0 B";
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
+  const handleDownload = (record) => {
+    const content = `University Practical Examination\nDay ${record.day}\nDate: ${record.date}\nTime: ${record.time}\nVenue: ${record.venue}\n`;
+    const blob = new Blob([content], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `Day_${record.day}_examination.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  if (loading) {
+    return (
+      <div style={{
+        background: "#F9FAFB", minHeight: 720, padding: "40px 48px",
+        fontFamily: "-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif", color: "#111827",
+        display: "flex", alignItems: "center", justifyContent: "center"
+      }}>
+        <div style={{ fontSize: 16, fontWeight: 600, color: "#6B7280" }}>Loading examination schedule...</div>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen text-gray-200 px-4 py-10 md:px-10" style={{ backgroundColor: '#0B0F1A' }}>
-      <div className="max-w-6xl mx-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-2">
-          <div>
-            <p className="text-xs tracking-[0.2em] uppercase text-indigo-400 font-semibold mb-2">Student Portal</p>
-            <h1 className="text-3xl md:text-4xl font-bold text-white" style={{ fontFamily: "'Playfair Display', serif" }}>
-              University Practical Examination
-            </h1>
-            <p className="text-gray-400 mt-2 text-sm md:text-base">Schedules, venues and results for your practical examinations.</p>
+    <div style={{
+      background: "#F9FAFB", minHeight: 720, overflowX: "hidden",
+      fontFamily: "-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif", color: "#111827",
+    }}>
+      <style>{styles}</style>
+
+      <div style={{ padding: "20px", fontFamily: "-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif" }}>
+        <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: 1.2, color: "#4338CA", marginBottom: 8 }}>
+          STUDENT PORTAL
+        </div>
+        <h1 style={{
+          fontFamily: "'Playfair Display', Georgia, serif", fontWeight: 700,
+          fontSize: "clamp(22px, 6vw, 30px)", margin: "0 0 10px", lineHeight: 1.25, color: "#111827",
+        }}>
+          University Practical Examination
+        </h1>
+        <p style={{ color: "#6B7280", fontSize: 14, lineHeight: 1.6, margin: "0 0 20px" }}>
+          View your examination schedule across all 12 days. Review venue assignments and download examination materials and PDFs published by the administration.
+        </p>
+
+        <div style={{
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          background: "#FFFFFF", border: "1px solid #E5E7EB", borderRadius: 12,
+          padding: "14px 18px", marginBottom: 20, flexWrap: "wrap", gap: 6
+        }}>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+            <span style={{ fontSize: 22, fontWeight: 700 }}>{records.length}</span>
+            <span style={{ fontSize: 13, color: "#6B7280" }}>Examinations</span>
           </div>
-          <button
-            onClick={() => navigate(-1)}
-            className="hidden md:flex items-center gap-2 text-sm text-gray-400 hover:text-white transition"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M19 12H5M12 19l-7-7 7-7" />
-            </svg>
-            Back
-          </button>
+          <span style={{ fontSize: 12, color: "#9CA3AF" }}>
+            Showing {Math.min(start + 1, records.length)}–{Math.min(start + PAGE_SIZE, records.length)} of {records.length}
+          </span>
         </div>
 
-        {/* Summary bar */}
-        <div className="flex flex-wrap items-center gap-3 mt-6 mb-5">
-          <div
-            className="rounded-xl px-4 py-2.5 text-sm text-gray-300"
-            style={{ background: 'rgba(17, 24, 39, 0.7)', border: '1px solid rgba(99,102,241,0.15)', backdropFilter: 'blur(10px)' }}
-          >
-            <span className="text-white font-semibold">12</span> Records
-          </div>
-        </div>
-
-        {/* Records table */}
-        <div
-          className="rounded-2xl overflow-hidden shadow-2xl"
-          style={{ background: 'rgba(17, 24, 39, 0.7)', border: '1px solid rgba(99,102,241,0.15)', backdropFilter: 'blur(10px)' }}
-        >
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm text-left">
-              <thead>
-                <tr className="border-b border-white/10 text-gray-400 uppercase text-xs tracking-wider">
-                  <th className="px-5 py-4 font-semibold">Days</th>
-                  <th className="px-5 py-4 font-semibold">Date</th>
-                  <th className="px-5 py-4 font-semibold">Time</th>
-                  <th className="px-5 py-4 font-semibold">Venue</th>
-                  <th className="px-5 py-4 font-semibold text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/5">
-                {pageRecords.map((record, idx) => (
-                  <tr
-                    key={idx}
-                    className="row-hover transition"
-                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'rgba(99,102,241,0.06)')}
-                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
-                  >
-                    <td className="px-5 py-4 text-white font-medium">{record.day}</td>
-                    <td className="px-5 py-4 text-gray-300">{record.date}</td>
-                    <td className="px-5 py-4 text-gray-300">{record.time}</td>
-                    <td className="px-5 py-4 text-gray-300">{record.venue}</td>
-                    <td className="px-5 py-4">
-                      <div className="flex items-center justify-end gap-2">
-                        <IconBtn type="view" />
-                        <IconBtn type="download" />
+        <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 24 }}>
+          {pageRecords.map((r) => (
+            <div key={r.id}>
+              <div className="upe-row">
+                <div className="upe-day">Day {r.day}</div>
+                <div style={{ fontSize: 13.5 }}>{r.date}</div>
+                <div className="upe-time" style={{ fontSize: 13.5, color: "#6B7280" }}>{r.time}</div>
+                <div style={{ fontSize: 13.5, color: "#111827" }}>{r.venue}</div>
+                <div className="upe-actions">
+                  <button className="upe-view" onClick={() => setViewing(r)} title="View details">
+                    <Eye size={14} /> View
+                  </button>
+                  <button className="upe-dl" onClick={() => handleDownload(r)} title="Download record">
+                    <Download size={14} /> Download
+                  </button>
+                </div>
+              </div>
+              <div className="upe-pdf-section">
+                {r.hasPdf ? (
+                  <div className="upe-pdf-info">
+                    <div className="upe-pdf-name">
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <FileText size={15} color="#4338CA" />
+                        <span>{r.pdfName}</span>
                       </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Pagination */}
-          <div className="flex items-center justify-between px-5 py-4 border-t border-white/10" style={{ backgroundColor: 'rgba(0,0,0,0.2)' }}>
-            <p className="text-xs text-gray-500">
-              Showing {start + 1}–{Math.min(start + pageSize, records.length)} of {records.length} records
-            </p>
-            <div className="flex items-center gap-1.5">
-              {/* Previous button */}
-              <button
-                onClick={() => goTo(currentPage - 1)}
-                disabled={currentPage === 1}
-                className="page-btn w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:bg-white/5 disabled:opacity-30 disabled:cursor-not-allowed"
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M15 18l-6-6 6-6" />
-                </svg>
-              </button>
-
-              {/* Page numbers */}
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                <button
-                  key={page}
-                  onClick={() => goTo(page)}
-                  className="page-btn w-8 h-8 rounded-lg text-sm font-medium transition"
-                  style={
-                    page === currentPage
-                      ? {
-                        background: 'linear-gradient(135deg, #2A4BD9 0%, #4338CA 100%)',
-                        color: 'white',
-                      }
-                      : {
-                        color: '#9ca3af',
-                      }
-                  }
-                  onMouseEnter={(e) => page !== currentPage && (e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.05)')}
-                  onMouseLeave={(e) => page !== currentPage && (e.currentTarget.style.backgroundColor = 'transparent')}
-                >
-                  {page}
-                </button>
-              ))}
-
-              {/* Next button */}
-              <button
-                onClick={() => goTo(currentPage + 1)}
-                disabled={currentPage === totalPages}
-                className="page-btn w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:bg-white/5 disabled:opacity-30 disabled:cursor-not-allowed"
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M9 18l6-6-6-6" />
-                </svg>
-              </button>
+                      <span style={{ fontSize: 11.5, color: "#9CA3AF" }}>({formatSize(r.pdfSize)})</span>
+                    </div>
+                    <button
+                      className="upe-pdf-btn"
+                      onClick={() => window.open(`/api/university-practical/${r.id}/pdf`, '_blank')}
+                    >
+                      <Eye size={13} /> View PDF
+                    </button>
+                  </div>
+                ) : (
+                  <div className="upe-no-pdf">
+                    No examination PDF available yet
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
+          ))}
+        </div>
+
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, flexWrap: "wrap" }}>
+          <button onClick={() => goTo(page - 1)} disabled={page === 1} style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid #E5E7EB", background: "transparent", fontSize: 13, color: page === 1 ? "#D1D5DB" : "#374151", cursor: page === 1 ? "default" : "pointer" }}>Previous</button>
+          {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+            <button key={p} onClick={() => goTo(p)} style={{ width: 32, height: 32, borderRadius: 8, border: p === page ? "1px solid #4F46E5" : "1px solid #E5E7EB", background: p === page ? "#4F46E5" : "transparent", color: p === page ? "#fff" : "#6B7280", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>{p}</button>
+          ))}
+          <button onClick={() => goTo(page + 1)} disabled={page === totalPages} style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid #E5E7EB", background: "transparent", fontSize: 13, color: page === totalPages ? "#D1D5DB" : "#374151", cursor: page === totalPages ? "default" : "pointer" }}>Next</button>
         </div>
       </div>
+
+      {viewing && (
+        <div style={{
+          position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+          background: "rgba(0, 0, 0, 0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50
+        }}>
+          <div style={{
+            background: "#FFFFFF", borderRadius: 12, padding: "28px", maxWidth: 500, width: "90%", maxHeight: "80vh", overflowY: "auto",
+            boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1)"
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+              <h2 style={{ fontFamily: "'Playfair Display', Georgia, serif", fontSize: 24, fontWeight: 700, margin: 0 }}>Day {viewing.day}</h2>
+              <button onClick={() => setViewing(null)} style={{ border: "none", background: "transparent", cursor: "pointer", padding: 0 }}>
+                <X size={20} color="#6B7280" />
+              </button>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              <div>
+                <div style={{ fontSize: 11.5, fontWeight: 700, color: "#9CA3AF", letterSpacing: 0.5, marginBottom: 4 }}>DATE</div>
+                <div style={{ fontSize: 15.5, fontWeight: 600, color: "#111827" }}>{viewing.date}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: 11.5, fontWeight: 700, color: "#9CA3AF", letterSpacing: 0.5, marginBottom: 4 }}>TIME</div>
+                <div style={{ fontSize: 15.5, fontWeight: 600, color: "#111827" }}>{viewing.time}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: 11.5, fontWeight: 700, color: "#9CA3AF", letterSpacing: 0.5, marginBottom: 4 }}>VENUE</div>
+                <div style={{ fontSize: 15.5, fontWeight: 600, color: "#111827" }}>{viewing.venue}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: 11.5, fontWeight: 700, color: "#9CA3AF", letterSpacing: 0.5, marginBottom: 4 }}>PDF</div>
+                {viewing.hasPdf ? (
+                  <div style={{ fontSize: 13.5, color: "#4F46E5", textDecoration: "underline", cursor: "pointer" }} onClick={() => window.open(`/api/university-practical/${viewing.id}/pdf`, '_blank')}>
+                    {viewing.pdfName} ({formatSize(viewing.pdfSize)})
+                  </div>
+                ) : (
+                  <div style={{ fontSize: 13.5, color: "#9CA3AF" }}>Not available</div>
+                )}
+              </div>
+            </div>
+            <button onClick={() => setViewing(null)} style={{ width: "100%", marginTop: 20, padding: "10px 16px", borderRadius: 8, border: "1px solid #E5E7EB", background: "#FFFFFF", color: "#374151", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>Close</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
