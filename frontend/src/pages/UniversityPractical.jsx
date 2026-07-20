@@ -106,15 +106,31 @@ export default function UniversityPractical() {
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
-  const handleDownload = (record) => {
-    const content = `University Practical Examination\nDay ${record.day}\nDate: ${record.date}\nTime: ${record.time}\nVenue: ${record.venue}\n`;
-    const blob = new Blob([content], { type: "text/plain" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `Day_${record.day}_examination.txt`;
-    a.click();
-    URL.revokeObjectURL(url);
+  const handleDownload = async (record) => {
+    try {
+      const token = localStorage.getItem('authToken');
+      const res = await fetch(`/api/university-practical/${record.id}/pdf`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (!res.ok) {
+        flash('Error downloading PDF');
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const filename = record.pdfName || `Day_${record.day}_examination.pdf`;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Error downloading PDF:', err);
+      flash('Error downloading PDF');
+    }
   };
 
   if (loading) {
@@ -173,9 +189,6 @@ export default function UniversityPractical() {
                 <div className="upe-time" style={{ fontSize: 13.5, color: "#6B7280" }}>{r.time}</div>
                 <div style={{ fontSize: 13.5, color: "#111827" }}>{r.venue}</div>
                 <div className="upe-actions">
-                  <button className="upe-view" onClick={() => setViewing(r)} title="View details">
-                    <Eye size={14} /> View
-                  </button>
                   <button className="upe-dl" onClick={() => handleDownload(r)} title="Download record">
                     <Download size={14} /> Download
                   </button>

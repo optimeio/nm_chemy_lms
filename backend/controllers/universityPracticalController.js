@@ -60,7 +60,7 @@ exports.getRecordWithPdf = async (req, res) => {
     
     // Send PDF with proper headers
     res.setHeader('Content-Type', record.pdfFile.mimeType || 'application/pdf');
-    res.setHeader('Content-Disposition', `inline; filename="${record.pdfFile.originalName}"`);
+    res.setHeader('Content-Disposition', `attachment; filename="${record.pdfFile.originalName}"`);
     res.setHeader('Content-Length', record.pdfFile.data.length);
     res.send(record.pdfFile.data);
   } catch (err) {

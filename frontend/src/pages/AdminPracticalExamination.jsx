@@ -87,6 +87,9 @@ export default function AdminPracticalExamination() {
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState("");
   const [uploadingId, setUploadingId] = useState(null);
+  const [stagedPdfs, setStagedPdfs] = useState({}); // { [recordId]: file }
+  const [editingRecordId, setEditingRecordId] = useState(null);
+  const [editValues, setEditValues] = useState({});
   const fileInputs = useRef({});
 
   // Fetch records on mount
@@ -126,10 +129,19 @@ export default function AdminPracticalExamination() {
     if (input) input.click();
   };
 
-  const onFileSelected = async (recordId, file) => {
+  const onFileSelected = (recordId, file) => {
     if (!file) return;
     if (file.type !== "application/pdf") {
       flash("Only PDF files are allowed.");
+      return;
+    }
+    setStagedPdfs((prev) => ({ ...prev, [recordId]: file }));
+  };
+
+  const submitPdf = async (recordId) => {
+    const file = stagedPdfs[recordId];
+    if (!file) {
+      flash("Please select a PDF before submitting.");
       return;
     }
 
@@ -149,6 +161,11 @@ export default function AdminPracticalExamination() {
 
       if (res.ok) {
         flash("PDF uploaded successfully");
+        setStagedPdfs((prev) => {
+          const next = { ...prev };
+          delete next[recordId];
+          return next;
+        });
         await fetchRecords();
       } else {
         flash("Error uploading PDF");
@@ -161,13 +178,15 @@ export default function AdminPracticalExamination() {
     }
   };
 
+  const [pdfViewingUrl, setPdfViewingUrl] = useState(null);
+
   const viewPdf = async (recordId) => {
     try {
-      // Open PDF in new tab
-      window.open(`/api/university-practical/${recordId}/pdf`, '_blank', 'noopener,noreferrer');
+      const url = `/api/university-practical/${recordId}/pdf`;
+      setPdfViewingUrl(url);
     } catch (err) {
       console.error('Error viewing PDF:', err);
-      flash("Error opening PDF");
+      flash('Error opening PDF');
     }
   };
 
@@ -182,7 +201,6 @@ export default function AdminPracticalExamination() {
           'Authorization': `Bearer ${token}`
         }
       });
-
       if (res.ok) {
         flash("PDF deleted successfully");
         await fetchRecords();
@@ -195,6 +213,30 @@ export default function AdminPracticalExamination() {
     }
   };
 
+  const startEdit = (record) => {
+    setEditingRecordId(record.id);
+    setEditValues({ day: record.day, date: record.date, time: record.time, venue: record.venue });
+  };
+
+  const saveEdit = async (recordId) => {
+    const token = localStorage.getItem('authToken');
+    const res = await fetch(`/api/university-practical/${recordId}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify(editValues)
+    });
+    if (res.ok) {
+      flash('Record updated successfully');
+      setEditingRecordId(null);
+      await fetchRecords();
+    } else {
+      flash('Error updating record');
+    }
+  };
+
   const formatSize = (bytes) => {
     if (!bytes) return "0 B";
     if (bytes < 1024) return `${bytes} B`;
@@ -202,15 +244,33 @@ export default function AdminPracticalExamination() {
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
-  const handleDownload = (record) => {
-    const content = `University Practical Examination\nDay ${record.day}\nDate: ${record.date}\nTime: ${record.time}\nVenue: ${record.venue}\n`;
-    const blob = new Blob([content], { type: "text/plain" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `Day_${record.day}_examination.txt`;
-    a.click();
-    URL.revokeObjectURL(url);
+  const handleDownload = async (record) => {
+    try {
+      const token = localStorage.getItem('authToken');
+      const res = await fetch(`/api/university-practical/${record.id}/pdf`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!res.ok) {
+        flash('Error downloading PDF');
+        return;
+      }
+
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const filename = record.pdfName || `Day_${record.day}_examination.pdf`;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Error downloading PDF:', err);
+      flash('Error downloading PDF');
+    }
   };
 
   if (loading) {
@@ -273,29 +333,52 @@ export default function AdminPracticalExamination() {
             <div style={{ fontSize: 13.5, color: "#6B7280" }}>{r.time}</div>
             <div style={{ fontSize: 13.5, color: "#111827" }}>{r.venue}</div>
             <div className="upe-actions">
-              <button
-                onClick={() => setViewing(r)}
-                title="View"
-                style={{
-                  display: "flex", alignItems: "center", gap: 6, padding: "8px 14px",
-                  borderRadius: 8, border: "1px solid #4F46E5", background: "#4F46E5",
-                  color: "#fff", fontSize: 12.5, fontWeight: 600, cursor: "pointer",
-                }}
-              >
-                <Eye size={14} /> View
-              </button>
-              <button
-                onClick={() => handleDownload(r)}
-                title="Download"
-                style={{
-                  display: "flex", alignItems: "center", gap: 6, padding: "8px 14px",
-                  borderRadius: 8, border: "1px solid #D1D5DB", background: "#F3F4F6",
-                  color: "#374151", fontSize: 12.5, fontWeight: 600, cursor: "pointer",
-                }}
-              >
-                <Download size={14} /> Download
-              </button>
-            </div>
+  {r.day !== 1 && (
+    <button
+      onClick={() => setViewing(r)}
+      title="View"
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 6,
+        padding: "8px 14px",
+        borderRadius: 8,
+        border: "1px solid #4F46E5",
+        background: "#4F46E5",
+        color: "#fff",
+        fontSize: 12.5,
+        fontWeight: 600,
+        cursor: "pointer",
+      }}
+    >
+      <Eye size={14} /> View
+    </button>
+  )}
+  <button
+    onClick={() => handleDownload(r)}
+    title="Download"
+    style={{
+      display: "flex",
+      alignItems: "center",
+      gap: 6,
+      padding: "8px 14px",
+      borderRadius: 8,
+      border: "1px solid #D1D5DB",
+      background: "#F3F4F6",
+      color: "#374151",
+      fontSize: 12.5,
+      fontWeight: 600,
+      cursor: "pointer",
+    }}
+  >
+    <Download size={14} /> Download
+  </button>
+  {!editingRecordId && (
+    <button onClick={() => startEdit(r)} style={{ display: "flex", alignItems: "center", gap: 5, padding: "8px 14px", borderRadius: 8, border: "1px solid #4F46E5", background: "transparent", color: "#4F46E5", fontSize: 12.5, fontWeight: 600, cursor: "pointer" }}>
+      Edit
+    </button>
+  )}
+</div>
 
             <input
               ref={(el) => (fileInputs.current[r.id] = el)}
@@ -305,7 +388,46 @@ export default function AdminPracticalExamination() {
               onChange={(ev) => { onFileSelected(r.id, ev.target.files[0]); ev.target.value = ""; }}
             />
             <div style={{ gridColumn: "1 / -1", borderTop: "1px solid #E5E7EB", marginTop: 4, paddingTop: 12 }}>
-              {r.hasPdf ? (
+              {stagedPdfs[r.id] ? (
+                <div className="upe-pdf-row">
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <FileText size={15} color="#4338CA" />
+                    <span style={{ fontSize: 12.5, color: "#111827" }}>{stagedPdfs[r.id].name} (Staged)</span>
+                  </div>
+                  <div className="upe-pdf-actions">
+                    <button
+                      onClick={() => {
+                        setStagedPdfs((prev) => {
+                          const next = { ...prev };
+                          delete next[r.id];
+                          return next;
+                        });
+                      }}
+                      style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 10px", borderRadius: 7, border: "1px solid #FCA5A5", background: "transparent", color: "#DC2626", fontSize: 12, fontWeight: 600, cursor: "pointer" }}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => submitPdf(r.id)}
+                      disabled={uploadingId === r.id}
+                      style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 10px", borderRadius: 7, border: "1px solid #4F46E5", background: "transparent", color: "#4F46E5", fontSize: 12, fontWeight: 600, cursor: uploadingId === r.id ? "not-allowed" : "pointer", opacity: uploadingId === r.id ? 0.6 : 1 }}
+                    >
+                      Submit
+                    </button>
+                  </div>
+                </div>
+              ) : editingRecordId === r.id ? (
+                <div className="upe-edit-form" style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <input type="number" value={editValues.day} onChange={e => setEditValues({ ...editValues, day: Number(e.target.value) })} placeholder="Day" style={{ padding: '4px', borderRadius: 4 }} />
+                  <input type="date" value={editValues.date} onChange={e => setEditValues({ ...editValues, date: e.target.value })} style={{ padding: '4px', borderRadius: 4 }} />
+                  <input type="time" value={editValues.time} onChange={e => setEditValues({ ...editValues, time: e.target.value })} style={{ padding: '4px', borderRadius: 4 }} />
+                  <input type="text" value={editValues.venue} onChange={e => setEditValues({ ...editValues, venue: e.target.value })} placeholder="Venue" style={{ padding: '4px', borderRadius: 4 }} />
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button onClick={() => saveEdit(r.id)} style={{ padding: '6px 10px', borderRadius: 7, border: '1px solid #4F46E5', background: 'transparent', color: '#4F46E5', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Save</button>
+                    <button onClick={() => setEditingRecordId(null)} style={{ padding: '6px 10px', borderRadius: 7, border: '1px solid #FCA5A5', background: 'transparent', color: '#DC2626', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Cancel</button>
+                  </div>
+                </div>
+              ) : r.hasPdf ? (
                 <div className="upe-pdf-row">
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     <FileText size={15} color="#4338CA" />
@@ -317,7 +439,7 @@ export default function AdminPracticalExamination() {
                       onClick={() => viewPdf(r.id)}
                       style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 10px", borderRadius: 7, border: "1px solid #D1D5DB", background: "transparent", color: "#4338CA", fontSize: 12, fontWeight: 600, cursor: "pointer" }}
                     >
-                      <Eye size={13} /> View PDF
+                      <Eye size={13} /> View
                     </button>
                     <button
                       onClick={() => triggerUpload(r.id)}

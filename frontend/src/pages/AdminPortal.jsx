@@ -49,6 +49,7 @@ import BrandLogo from '../components/BrandLogo';
 import AdminPracticalExamination from './AdminPracticalExamination';
 import AdminAnnouncements from './AdminAnnouncements';
 import HackathonManager from './HackathonManager';
+import CertificatesAdmin from './CertificatesAdmin';
 
 const MENU_ITEMS = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -131,21 +132,7 @@ export default function AdminPortal() {
   const [feedbackSendingId, setFeedbackSendingId] = useState(null);
   const [feedbackError, setFeedbackError] = useState('');
 
-  // CERTIFICATES
-  const [certModalOpen, setCertModalOpen] = useState(false);
-  const [certMode, setCertMode] = useState('auto'); // 'auto' | 'manual'
-  const [certSearch, setCertSearch] = useState('');
-  const [certFilter, setCertFilter] = useState('all'); // 'all' | 'issued' | 'draft' | 'pending'
-  const [certList, setCertList] = useState([
-    { id: 'CERT-001', recipient: 'Arjun Mehta',    course: 'Data Structures',  date: '2026-06-15', issuer: 'Prof. Menon',    serial: 'NM-2026-001', status: 'issued' },
-    { id: 'CERT-002', recipient: 'Priya Sharma',   course: 'Machine Learning', date: '2026-06-20', issuer: 'Prof. Rao',      serial: 'NM-2026-002', status: 'issued' },
-    { id: 'CERT-003', recipient: 'Ravi Kumar',     course: 'Web Development',  date: '2026-07-01', issuer: 'Prof. Menon',    serial: 'NM-2026-003', status: 'draft'  },
-    { id: 'CERT-004', recipient: 'Sneha Iyer',     course: 'EV Design Sprint', date: '2026-07-10', issuer: 'Career Services',serial: 'NM-2026-004', status: 'pending'},
-  ]);
-  const [certForm, setCertForm] = useState({ recipient: '', course: '', date: '', issuer: '', serial: '', template: 'standard' });
-  const [autoTemplate, setAutoTemplate] = useState('standard');
-  const [autoRecipientGroup, setAutoRecipientGroup] = useState('all-students');
-  const [certSaved, setCertSaved] = useState(false);
+  // CERTIFICATES — managed by CertificatesAdmin component
 
   // Settings
   const [settingsBrand, setSettingsBrand] = useState('Chemy LMS');
@@ -510,7 +497,7 @@ export default function AdminPortal() {
       )}
 
       <div 
-        className="bg-white border-r border-slate-200 transition-transform duration-300 flex flex-col z-20"
+        className="bg-white border-r border-slate-200 transition-transform duration-300 flex flex-col z-20 w-72 md:w-72"
         style={{
           width: 280,
           minWidth: 280,
@@ -567,7 +554,7 @@ export default function AdminPortal() {
         </div>
       </div>
 
-      <div className="flex-1 flex flex-col overflow-hidden">
+        <div className="flex-1 flex flex-col min-w-0 overflow-y-auto overflow-x-auto">
         <div className="flex items-center justify-between px-6 py-4 bg-white border-b border-slate-200">
           <button 
             onClick={() => setSidebarOpen(!sidebarOpen)} 
@@ -587,7 +574,7 @@ export default function AdminPortal() {
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8 min-w-0">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8 min-w-0 w-full">
           {activeTab === 'dashboard' && (
             <div className="max-w-6xl mx-auto">
               {/* Header row */}
@@ -716,296 +703,10 @@ export default function AdminPortal() {
           )}
 
           {activeTab === 'certificates' && (
-            <div className="max-w-6xl mx-auto">
-              {/* Page header */}
-              <div className="flex items-center justify-between flex-wrap gap-4 mb-8">
-                <div>
-                  <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2"><GraduationCap size={26} className="text-blue-600" /> Certificates</h1>
-                  <p className="text-slate-500 text-sm mt-1">Issue, manage, and track course completion certificates.</p>
-                </div>
-                <button
-                  onClick={() => { setCertModalOpen(true); setCertSaved(false); setCertForm({ recipient: '', course: '', date: '', issuer: '', serial: `NM-${new Date().getFullYear()}-${String(certList.length + 1).padStart(3,'0')}`, template: 'standard' }); }}
-                  className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-xl shadow-md transition"
-                >
-                  <FileBadge size={16} /> New Certificate
-                </button>
-              </div>
-
-              {/* Search + Filter bar */}
-              <div className="flex flex-wrap items-center gap-3 mb-6">
-                <div className="relative flex-1 min-w-[200px]">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
-                  <input
-                    type="text"
-                    placeholder="Search by recipient, course, or serial..."
-                    value={certSearch}
-                    onChange={(e) => setCertSearch(e.target.value)}
-                    className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-xl text-xs focus:outline-none"
-                  />
-                </div>
-                <div className="flex gap-2">
-                  {['all','issued','draft','pending'].map(f => (
-                    <button
-                      key={f}
-                      onClick={() => setCertFilter(f)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold capitalize transition border ${
-                        certFilter === f
-                          ? 'bg-blue-600 text-white border-blue-600'
-                          : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'
-                      }`}
-                    >{f === 'all' ? 'All' : f.charAt(0).toUpperCase() + f.slice(1)}</button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Certificate list */}
-              <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="bg-slate-50 text-slate-500 text-xs font-bold border-b border-slate-200">
-                      <th className="p-4">Serial</th>
-                      <th className="p-4">Recipient</th>
-                      <th className="p-4">Course</th>
-                      <th className="p-4">Issuer</th>
-                      <th className="p-4">Date</th>
-                      <th className="p-4">Status</th>
-                      <th className="p-4">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {certList
-                      .filter(c => certFilter === 'all' || c.status === certFilter)
-                      .filter(c => !certSearch ||
-                        c.recipient.toLowerCase().includes(certSearch.toLowerCase()) ||
-                        c.course.toLowerCase().includes(certSearch.toLowerCase()) ||
-                        c.serial.toLowerCase().includes(certSearch.toLowerCase())
-                      )
-                      .map(c => (
-                        <tr key={c.id} className="border-b border-slate-100 hover:bg-slate-50 transition">
-                          <td className="p-4 text-xs font-mono text-slate-500">{c.serial}</td>
-                          <td className="p-4 text-sm font-semibold text-slate-800">{c.recipient}</td>
-                          <td className="p-4 text-xs text-slate-500">{c.course}</td>
-                          <td className="p-4 text-xs text-slate-500">{c.issuer}</td>
-                          <td className="p-4 text-xs text-slate-400">{c.date}</td>
-                          <td className="p-4">
-                            <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase ${
-                              c.status === 'issued'  ? 'bg-emerald-50 text-emerald-600' :
-                              c.status === 'draft'   ? 'bg-amber-50 text-amber-600' :
-                              'bg-slate-100 text-slate-500'
-                            }`}>{c.status}</span>
-                          </td>
-                          <td className="p-4">
-                            <div className="flex items-center gap-3">
-                              <button
-                                onClick={() => alert(`Downloading certificate for ${c.recipient}`)}
-                                className="flex items-center gap-1 text-xs font-semibold text-blue-600 hover:text-blue-800 transition"
-                              >
-                                <Download size={13} /> Download
-                              </button>
-                              <button
-                                onClick={() => setCertList(prev => prev.filter(x => x.id !== c.id))}
-                                className="text-xs font-semibold text-rose-500 hover:text-rose-700 transition"
-                              >
-                                Delete
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))
-                    }
-                    {certList.filter(c => certFilter === 'all' || c.status === certFilter).length === 0 && (
-                      <tr><td colSpan={7} className="p-8 text-center text-xs text-slate-400">No certificates found.</td></tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* New Certificate Modal */}
-              {certModalOpen && (
-                <div
-                  className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
-                  onClick={(e) => { if (e.target === e.currentTarget) setCertModalOpen(false); }}
-                >
-                  <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden">
-                    {/* Modal header */}
-                    <div className="flex items-center justify-between px-7 py-5 border-b border-slate-100">
-                      <div className="flex items-center gap-2">
-                        <FileBadge size={20} className="text-blue-600" />
-                        <h2 className="text-base font-bold text-slate-900">New Certificate</h2>
-                      </div>
-                      <button onClick={() => setCertModalOpen(false)} className="text-slate-400 hover:text-slate-600 text-xl font-bold">×</button>
-                    </div>
-
-                    {/* Mode tabs */}
-                    <div className="flex gap-1 px-7 pt-5">
-                      {[{id:'auto', label:'Automatic Generation', icon: Wand2}, {id:'manual', label:'Manual Creation', icon: PenLine}].map(m => (
-                        <button
-                          key={m.id}
-                          onClick={() => setCertMode(m.id)}
-                          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition border ${
-                            certMode === m.id
-                              ? 'bg-blue-600 text-white border-blue-600'
-                              : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'
-                          }`}
-                        >
-                          <m.icon size={14} /> {m.label}
-                        </button>
-                      ))}
-                    </div>
-
-                    <div className="px-7 py-6 space-y-4">
-                      {certMode === 'auto' ? (
-                        <>
-                          <p className="text-xs text-slate-500">Select a template and recipient group. Certificates will be auto-generated with data pulled from enrolled courses and user records.</p>
-                          <div>
-                            <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Template</label>
-                            <select
-                              value={autoTemplate}
-                              onChange={e => setAutoTemplate(e.target.value)}
-                              className="w-full px-4 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none"
-                            >
-                              <option value="standard">Standard Completion</option>
-                              <option value="excellence">Excellence Award</option>
-                              <option value="hackathon">Hackathon Participation</option>
-                              <option value="internship">Internship Certificate</option>
-                            </select>
-                          </div>
-                          <div>
-                            <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Recipient Group</label>
-                            <select
-                              value={autoRecipientGroup}
-                              onChange={e => setAutoRecipientGroup(e.target.value)}
-                              className="w-full px-4 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none"
-                            >
-                              <option value="all-students">All Students</option>
-                              <option value="course-completers">Course Completers Only</option>
-                              <option value="hackathon-participants">Hackathon Participants</option>
-                              <option value="top-performers">Top Performers (Rank ≤ 10)</option>
-                            </select>
-                          </div>
-                          <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 text-xs text-blue-700">
-                            <strong>Auto-fill rules:</strong> Recipient name from user profile · Course from enrollment records · Date = today · Issuer = portal admin · Serial auto-incremented.
-                          </div>
-                        </>
-                      ) : (
-                        <>
-                          <p className="text-xs text-slate-500">Fill in all fields manually. All inputs are validated before saving.</p>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <div>
-                              <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Recipient Name *</label>
-                              <input
-                                placeholder="e.g. Arjun Mehta"
-                                value={certForm.recipient}
-                                onChange={e => setCertForm(p => ({...p, recipient: e.target.value}))}
-                                className="w-full px-4 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Course / Program *</label>
-                              <input
-                                placeholder="e.g. Data Structures"
-                                value={certForm.course}
-                                onChange={e => setCertForm(p => ({...p, course: e.target.value}))}
-                                className="w-full px-4 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Issue Date *</label>
-                              <input
-                                type="date"
-                                value={certForm.date}
-                                onChange={e => setCertForm(p => ({...p, date: e.target.value}))}
-                                className="w-full px-4 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Issuer</label>
-                              <input
-                                placeholder="e.g. Prof. Menon"
-                                value={certForm.issuer}
-                                onChange={e => setCertForm(p => ({...p, issuer: e.target.value}))}
-                                className="w-full px-4 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Serial No.</label>
-                              <input
-                                value={certForm.serial}
-                                onChange={e => setCertForm(p => ({...p, serial: e.target.value}))}
-                                className="w-full px-4 py-2 border border-slate-200 rounded-xl text-sm font-mono focus:outline-none"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Template</label>
-                              <select
-                                value={certForm.template}
-                                onChange={e => setCertForm(p => ({...p, template: e.target.value}))}
-                                className="w-full px-4 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none"
-                              >
-                                <option value="standard">Standard Completion</option>
-                                <option value="excellence">Excellence Award</option>
-                                <option value="hackathon">Hackathon Participation</option>
-                                <option value="internship">Internship Certificate</option>
-                              </select>
-                            </div>
-                          </div>
-                        </>
-                      )}
-
-                      {certSaved && (
-                        <div className="bg-emerald-50 border border-emerald-100 text-emerald-700 text-xs font-bold rounded-xl p-3">
-                          ✓ Certificate saved successfully!
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Modal footer */}
-                    <div className="flex justify-end gap-3 px-7 pb-6">
-                      <button onClick={() => setCertModalOpen(false)} className="px-5 py-2 rounded-xl text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200">Cancel</button>
-                      <button
-                        onClick={() => {
-                          if (certMode === 'manual') {
-                            if (!certForm.recipient.trim() || !certForm.course.trim() || !certForm.date) {
-                              alert('Please fill in Recipient, Course, and Date.');
-                              return;
-                            }
-                            const newCert = {
-                              id: `CERT-${Date.now()}`,
-                              recipient: certForm.recipient,
-                              course: certForm.course,
-                              date: certForm.date,
-                              issuer: certForm.issuer || 'Admin',
-                              serial: certForm.serial || `NM-${new Date().getFullYear()}-${String(certList.length + 1).padStart(3,'0')}`,
-                              status: 'draft',
-                            };
-                            setCertList(prev => [newCert, ...prev]);
-                          } else {
-                            const newCert = {
-                              id: `CERT-${Date.now()}`,
-                              recipient: `Auto — ${autoRecipientGroup}`,
-                              course: `Template: ${autoTemplate}`,
-                              date: new Date().toISOString().split('T')[0],
-                              issuer: adminName,
-                              serial: `NM-${new Date().getFullYear()}-${String(certList.length + 1).padStart(3,'0')}`,
-                              status: 'pending',
-                            };
-                            setCertList(prev => [newCert, ...prev]);
-                          }
-                          setCertSaved(true);
-                          setTimeout(() => { setCertModalOpen(false); setCertSaved(false); }, 1200);
-                        }}
-                        className="px-5 py-2 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-md"
-                      >
-                        {certMode === 'auto' ? 'Generate Certificates' : 'Save Certificate'}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
+            <div className="overflow-x-auto">
+              <CertificatesAdmin />
             </div>
           )}
-
-
 
           {activeTab === 'hackathons' && (
             <HackathonManager dbHackathonsList={hackathonsList} usersList={usersList} />
@@ -1036,12 +737,12 @@ export default function AdminPortal() {
                   <table className="w-full text-left border-collapse">
                     <thead>
                       <tr className="bg-slate-50 text-slate-500 text-xs font-bold border-b border-slate-200">
-                        <th className="p-4">Name</th>
-                        <th className="p-4">Email</th>
-                        <th className="p-4">Institution</th>
-                        <th className="p-4">Department</th>
-                        <th className="p-4">Access Level</th>
-                        <th className="p-4 text-right">Actions</th>
+                        <th className="p-4 break-words">Name</th>
+                        <th className="p-4 break-words">Email</th>
+                        <th className="p-4 break-words">Institution</th>
+                        <th className="p-4 break-words">Department</th>
+                        <th className="p-4 break-words">Access Level</th>
+                        <th className="p-4 text-right break-words">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 text-xs">
