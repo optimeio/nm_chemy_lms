@@ -1,449 +1,387 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo } from "react";
+import {
+  LayoutDashboard, FileText, Users, BookOpen, Video, ClipboardList, Bell,
+  Award, Mail, Settings, LogOut, Plus, Pencil, Trash2, X, Save, Pin,
+  PinOff, Megaphone, Link2,
+} from "lucide-react";
 
-const CATEGORIES = {
-  IMPORTANT: { label: "Important", color: "#f2994a" },
-  EVENT: { label: "Event", color: "#0fa39a" },
-  COURSE: { label: "Course", color: "#4a3aff" },
-  SYSTEM: { label: "System", color: "#7c8291" },
+// ---------------------------------------------------------------------------
+// seed data (mirrors the student-facing Announcements page)
+// ---------------------------------------------------------------------------
+
+const initialFeatured = {
+  badges: ["Featured", "Course update"],
+  emoji: "📊",
+  title: "New Power BI course is now live",
+  description:
+    "Master data visualization and business intelligence with our comprehensive Power BI course. Enrollment is open — build your first dashboard this week.",
+  author: "Learning Team",
+  date: "2026-07-12",
+  ctaLabel: "View course",
 };
 
-const emptyForm = {
-  title: "",
-  description: "",
-  category: "IMPORTANT",
-  author: "",
-  isPinned: false,
-  images: [],
+const initialAnnouncements = [
+  {
+    id: "an1",
+    category: "Important",
+    title: "Practical exam venue changed for Day 3",
+    description: "The Analytics Lab session on 22 Jul 2026 has moved to Lab Block A – 305. Please update your calendar.",
+    author: "Examination Office",
+    postedAgo: "2 hours ago",
+    pinned: true,
+  },
+  {
+    id: "an2",
+    category: "Events",
+    title: "Webinar: Future of Data Science",
+    description: "Join industry experts on 25 Jul 2026 at 4:00 PM IST for an insightful session on where the field is heading next.",
+    author: "Career Services",
+    postedAgo: "6 hours ago",
+    pinned: true,
+  },
+  {
+    id: "an3",
+    category: "Courses",
+    title: "New assignment posted in Data Structures",
+    description: "Assignment 4 covering binary trees and traversal algorithms is now available. Due 28 Jul 2026, 11:59 PM.",
+    author: "Prof. Menon",
+    postedAgo: "Yesterday",
+    pinned: true,
+  },
+  {
+    id: "an4",
+    category: "System",
+    title: "Scheduled maintenance this weekend",
+    description: "The portal will be briefly unavailable on 19 Jul 2026, 1:00–2:00 AM IST, for routine maintenance.",
+    author: "IT Support",
+    postedAgo: "2 days ago",
+    pinned: true,
+  },
+];
+
+const initialQuickLinks = [
+  { id: "q1", title: "Academic calendar", subtitle: "View important dates and deadlines" },
+  { id: "q2", title: "Exam schedule", subtitle: "Check upcoming exams" },
+  { id: "q3", title: "Assignment submission", subtitle: "View pending submissions" },
+];
+
+const uid = (p) => `${p}${Math.random().toString(36).slice(2, 9)}`;
+const CATEGORIES = ["Important", "Events", "Courses", "System"];
+const categoryDot = {
+  Important: "bg-amber-500", Events: "bg-emerald-500", Courses: "bg-indigo-500", System: "bg-slate-400",
+};
+const categoryText = {
+  Important: "text-amber-600", Events: "text-emerald-600", Courses: "text-indigo-600", System: "text-slate-500",
 };
 
-function NewAnnouncementModal({
-  open = true,
-  onClose = () => {},
-  onSave = () => {},
-  editingItem = null,
-}) {
-  const [form, setForm] = useState(editingItem || emptyForm);
-  const [pendingFiles, setPendingFiles] = useState([]);
-  const fileRef = useRef(null);
+const inputCls = "w-full rounded-lg border border-slate-200 px-3.5 py-2.5 text-sm text-slate-800 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100";
+const labelCls = "mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-slate-500";
 
-  if (!open) return null;
+// ---------------------------------------------------------------------------
+// shared bits
+// ---------------------------------------------------------------------------
 
-  const handleFileChoose = (e) => setPendingFiles(Array.from(e.target.files));
+function Card({ children, className = "" }) {
+  return <div className={`rounded-2xl border border-slate-100 bg-white p-6 shadow-sm ${className}`}>{children}</div>;
+}
 
-  const handleUploadImages = () => {
-    if (pendingFiles.length === 0) return;
-    const readers = pendingFiles.map(
-      (file) =>
-        new Promise((resolve) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result);
-          reader.readAsDataURL(file);
-        })
-    );
-    Promise.all(readers).then((results) => {
-      setForm((f) => ({ ...f, images: [...f.images, ...results] }));
-      setPendingFiles([]);
-      if (fileRef.current) fileRef.current.value = "";
-    });
-  };
-
-  const canSave = form.title.trim().length > 0 && form.description.trim().length > 0;
-
+function SectionHeader({ title, subtitle, onAdd, addLabel }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+    <div className="mb-5 flex items-center justify-between">
+      <div>
+        <h2 className="text-base font-semibold text-slate-800">{title}</h2>
+        {subtitle && <p className="text-sm text-slate-400">{subtitle}</p>}
+      </div>
+      {onAdd && (
+        <button onClick={onAdd} className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">
+          <Plus size={16} /> {addLabel}
+        </button>
+      )}
+    </div>
+  );
+}
 
-      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[88vh] overflow-y-auto">
-        <div className="px-8 pt-7 pb-2">
-          <h2 className="text-2xl font-semibold text-slate-900">
-            {editingItem ? "Edit announcement" : "New announcement"}
-          </h2>
+function RowActions({ onEdit, onDelete, extra }) {
+  return (
+    <div className="absolute right-3 top-3 flex gap-1 opacity-0 transition group-hover:opacity-100">
+      {extra}
+      <button onClick={onEdit} className="rounded-lg bg-slate-100 p-1.5 text-slate-500 hover:bg-slate-200"><Pencil size={14} /></button>
+      <button onClick={onDelete} className="rounded-lg bg-slate-100 p-1.5 text-slate-500 hover:bg-slate-200"><Trash2 size={14} /></button>
+    </div>
+  );
+}
+
+function EmptyRow({ text }) {
+  return <div className="rounded-2xl border border-dashed border-slate-200 p-8 text-center text-sm text-slate-400">{text}</div>;
+}
+
+function Modal({ title, onClose, children, onSave }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="w-full max-w-lg rounded-2xl bg-white shadow-xl">
+        <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+          <h3 className="text-base font-semibold text-slate-800">{title}</h3>
+          <button onClick={onClose} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"><X size={18} /></button>
         </div>
-
-        {/* Grid mirrors the screenshot exactly: left column is the form fields
-            (Title / Description / Category / Author), right column holds
-            Published Allocations on top and Slide Showcase Images below it. */}
-        <div
-          className="px-8 pb-6 grid gap-x-6 gap-y-5 text-left"
-          style={{
-            gridTemplateColumns: "1fr 1fr",
-            gridTemplateAreas: `
-              "title       allocations"
-              "description allocations"
-              "category    images"
-              "author      images"
-            `,
-          }}
-        >
-          <div style={{ gridArea: "title" }}>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">Title</label>
-            <input
-              type="text"
-              placeholder="e.g. Practical"
-              value={form.title}
-              onChange={(e) => setForm({ ...form, title: e.target.value })}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-            />
-          </div>
-
-          <div style={{ gridArea: "allocations" }} className="border border-slate-200 rounded-xl p-4">
-            <p className="text-sm font-medium text-slate-800 mb-2">Published Allocations</p>
-            <p className="text-sm text-slate-400">
-              {form.images.length === 0
-                ? "No allocations yet."
-                : `${form.images.length} image(s) attached.`}
-            </p>
-          </div>
-
-          <div style={{ gridArea: "description" }}>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">Description</label>
-            <textarea
-              rows="4"
-              placeholder="Details students need to know"
-              value={form.description}
-              onChange={(e) => setForm({ ...form, description: e.target.value })}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
-            />
-          </div>
-
-          <div style={{ gridArea: "category" }}>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">Category</label>
-            <select
-              value={form.category}
-              onChange={(e) => setForm({ ...form, category: e.target.value })}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-            >
-              {Object.entries(CATEGORIES).map(([key, c]) => (
-                <option key={key} value={key}>
-                  {c.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div style={{ gridArea: "images" }} className="border border-slate-200 rounded-xl p-4">
-            <p className="text-sm font-medium text-slate-800 mb-3">Slide Showcase Images</p>
-            <div className="flex items-center gap-2 mb-3">
-              <label className="cursor-pointer text-sm px-3 py-1.5 rounded-md bg-slate-100 border border-slate-300 text-slate-700 hover:bg-slate-200 transition">
-                Choose Files
-                <input
-                  ref={fileRef}
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  className="hidden"
-                  onChange={handleFileChoose}
-                />
-              </label>
-              <span className="text-xs text-slate-400 truncate">
-                {pendingFiles.length > 0 ? `${pendingFiles.length} file(s) selected` : "No file chosen"}
-              </span>
-            </div>
-            <button
-              onClick={handleUploadImages}
-              disabled={pendingFiles.length === 0}
-              className="w-full py-2 rounded-lg font-semibold text-white text-sm transition disabled:opacity-40"
-              style={{ background: "linear-gradient(90deg,#ec4899,#f472b6)" }}
-            >
-              Upload Images
-            </button>
-            {form.images.length > 0 && (
-              <div className="flex gap-2 mt-3 flex-wrap">
-                {form.images.map((src, i) => (
-                  <img key={i} src={src} className="w-12 h-12 object-cover rounded-md border border-slate-200" />
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div style={{ gridArea: "author" }}>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">Author</label>
-            <input
-              type="text"
-              placeholder="e.g. Examination Office"
-              value={form.author}
-              onChange={(e) => setForm({ ...form, author: e.target.value })}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-            />
-          </div>
-        </div>
-
-        <div className="px-8 pb-2 flex items-center gap-2 text-left">
-          <input
-            id="pin"
-            type="checkbox"
-            checked={form.isPinned}
-            onChange={(e) => setForm({ ...form, isPinned: e.target.checked })}
-            className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
-          />
-          <label htmlFor="pin" className="text-sm text-slate-700">
-            Pin this announcement
-          </label>
-        </div>
-
-        <div className="px-8 py-5 mt-4 border-t border-slate-100 flex justify-end gap-3">
-          <button
-            onClick={onClose}
-            className="px-5 py-2.5 rounded-lg text-sm font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 transition"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={() => canSave && onSave(form)}
-            disabled={!canSave}
-            className="px-5 py-2.5 rounded-lg text-sm font-semibold text-white transition disabled:opacity-40"
-            style={{ background: "linear-gradient(90deg,#4338ca,#6366f1)" }}
-          >
-            Save announcement
-          </button>
+        <div className="max-h-[65vh] overflow-y-auto px-5 py-4 space-y-4">{children}</div>
+        <div className="flex justify-end gap-2 border-t border-slate-100 px-5 py-4">
+          <button onClick={onClose} className="rounded-lg px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100">Cancel</button>
+          <button onClick={onSave} className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"><Save size={15} /> Save</button>
         </div>
       </div>
     </div>
   );
 }
 
-export default function AdminAnnouncements() {
-  const [announcements, setAnnouncements] = useState([
-    {id:1, title:"Practical exam venue changed for Day 3", desc:"The Analytics Lab session on 22 Jul 2026 has moved to Lab Block A – 305. Please update your calendar.", cat:"Important", author:"Examination Office", posted:"2 hours ago", pinned:true, images:[]},
-    {id:2, title:"Webinar: Future of Data Science", desc:"Join industry experts on 25 Jul 2026 at 4:00 PM IST for an insightful session on where the field is heading next.", cat:"Event", author:"Career Services", posted:"6 hours ago", pinned:true, images:[]},
-    {id:3, title:"New assignment posted in Data Structures", desc:"Assignment 4 covering binary trees and traversal algorithms is now available. Due 28 Jul 2026, 11:59 PM.", cat:"Course", author:"Prof. Menon", posted:"Yesterday", pinned:false, images:[]},
-    {id:4, title:"Scheduled maintenance this weekend", desc:"The portal will be briefly unavailable on 19 Jul 2026, 1:00–2:00 AM IST, for routine maintenance.", cat:"System", author:"IT Support", posted:"2 days ago", pinned:false, images:[]},
-  ]);
-  const [nextId, setNextId] = useState(5);
-  const [activeFilter, setActiveFilter] = useState("All");
-  
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editId, setEditId] = useState(null);
-  
-  const [modalForm, setModalForm] = useState(emptyForm);
+function Field({ label, children }) {
+  return <label className="block"><span className="mb-1 block text-xs font-medium text-slate-500">{label}</span>{children}</label>;
+}
 
-  const list = useMemo(() => {
-    return announcements.filter(a => activeFilter === "All" || a.cat === activeFilter);
-  }, [announcements, activeFilter]);
+// ---------------------------------------------------------------------------
+// 1. Featured announcement (single record, edit-in-place)
+// ---------------------------------------------------------------------------
 
-  const stats = useMemo(() => {
-    return {
-      total: announcements.length,
-      important: announcements.filter(a => a.cat === "Important").length,
-      week: announcements.filter(a => ["2 hours ago", "6 hours ago", "Yesterday"].includes(a.posted)).length,
-      pinned: announcements.filter(a => a.pinned).length
-    };
-  }, [announcements]);
+function FeaturedSection({ featured, setFeatured }) {
+  const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState(featured);
 
-  const stripeColor = (cat) => {
-    return {Important:"#e6497a", Event:"#0d9488", Course:"#4f3ff0", System:"#64748b"}[cat] || "#64748b";
-  };
-
-  const togglePin = (id) => {
-    setAnnouncements(prev => prev.map(a => a.id === id ? { ...a, pinned: !a.pinned } : a));
-  };
-
-  const deleteRow = (id) => {
-    if(window.confirm("Delete this announcement?")) {
-      setAnnouncements(prev => prev.filter(x => x.id !== id));
-    }
-  };
-
-  const editRow = (id) => {
-    const a = announcements.find(x => x.id === id);
-    if(a) {
-      setEditId(a.id);
-      setModalForm({
-        title: a.title,
-        description: a.desc || "",
-        category: (a.cat || "IMPORTANT").toUpperCase(),
-        author: a.author || "",
-        isPinned: !!a.pinned,
-        images: a.images || []
-      });
-      setIsModalOpen(true);
-    }
-  };
-
-  const openModal = () => {
-    setEditId(null);
-    setModalForm(emptyForm);
-    setIsModalOpen(true);
-  };
-
-  const closeModal = () => {
-    setIsModalOpen(false);
-  };
-
-  const save = (formData) => {
-    const { title, description, category, author, isPinned, images } = formData;
-    
-    // Map category name back to Title Case for visual badge compatibility
-    const visualCat = category.charAt(0).toUpperCase() + category.slice(1).toLowerCase();
-    const finalAuthor = author.trim() || "Admin";
-    
-    if(editId) {
-      setAnnouncements(prev => prev.map(a => 
-        a.id === editId ? { ...a, title, desc: description, cat: visualCat, author: finalAuthor, pinned: isPinned, images } : a
-      ));
-    } else {
-      setAnnouncements(prev => [
-        { id: nextId, posted: "Just now", title, desc: description, cat: visualCat, author: finalAuthor, pinned: isPinned, images },
-        ...prev
-      ]);
-      setNextId(n => n + 1);
-    }
-    closeModal();
-  };
+  const openEdit = () => { setDraft(featured); setOpen(true); };
+  const save = () => { setFeatured(draft); setOpen(false); };
 
   return (
-    <>
-      <style>{`
-        .admin-ann-wrapper {
-          --ink:#181524;
-          --ink-soft:#5c5876;
-          --bg:#f6f5fb;
-          --card:#ffffff;
-          --line:#e8e6f2;
-          --indigo:#4f3ff0;
-          --indigo-deep:#2f1fb8;
-          --violet:#7c6bf5;
-          --amber:#f59e0b;
-          --amber-bg:#fff4e0;
-          --teal:#0d9488;
-          --teal-bg:#e3f6f3;
-          --rose:#e6497a;
-          --rose-bg:#fde8ef;
-          --slate:#64748b;
-          --slate-bg:#eef1f6;
-          --radius:16px;
-          background: var(--bg);
-          color: var(--ink);
-          font-family: "Inter", "Segoe UI", Arial, sans-serif;
-          min-height: 100vh;
-        }
-        .admin-ann-wrapper * { box-sizing: border-box; }
-        .admin-ann-wrapper .shell { max-width: 1180px; margin: 0 auto; padding: 36px 28px 80px; }
-        .admin-ann-wrapper .topbar { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 28px; flex-wrap: wrap; gap: 16px; }
-        .admin-ann-wrapper .eyebrow { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--indigo); font-weight: 700; }
-        .admin-ann-wrapper h1 { font-size: 32px; margin: 6px 0 4px; letter-spacing: -0.02em; }
-        .admin-ann-wrapper .sub { color: var(--ink-soft); font-size: 14.5px; margin: 0; }
-        .admin-ann-wrapper .new-btn { background: linear-gradient(135deg, var(--indigo), var(--indigo-deep)); color: #fff; border: none; padding: 13px 22px; border-radius: 12px; font-size: 14.5px; font-weight: 600; cursor: pointer; box-shadow: 0 8px 20px -8px rgba(79,63,240,.55); transition: filter 0.2s; }
-        .admin-ann-wrapper .new-btn:hover { filter: brightness(1.05); }
-        .admin-ann-wrapper .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 26px; }
-        .admin-ann-wrapper .stat { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; }
-        .admin-ann-wrapper .stat .n { font-size: 26px; font-weight: 800; letter-spacing: -0.02em; }
-        .admin-ann-wrapper .stat .l { font-size: 12.5px; color: var(--ink-soft); margin-top: 2px; }
-        .admin-ann-wrapper .stat.total .n { color: var(--indigo); }
-        .admin-ann-wrapper .stat.important .n { color: var(--rose); }
-        .admin-ann-wrapper .stat.week .n { color: var(--teal); }
-        .admin-ann-wrapper .stat.pinned .n { color: var(--amber); }
-        .admin-ann-wrapper .filters { display: flex; gap: 8px; margin-bottom: 18px; flex-wrap: wrap; }
-        .admin-ann-wrapper .filters button { border: 1px solid var(--line); background: #fff; color: var(--ink-soft); padding: 9px 16px; border-radius: 999px; font-size: 13.5px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
-        .admin-ann-wrapper .filters button.active { background: var(--ink); color: #fff; border-color: var(--ink); }
-        .admin-ann-wrapper table { width: 100%; border-collapse: collapse; background: var(--card); border-radius: var(--radius); overflow: hidden; border: 1px solid var(--line); }
-        .admin-ann-wrapper thead th { text-align: left; font-size: 11.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-soft); padding: 14px 16px; background: #fbfaff; border-bottom: 1px solid var(--line); }
-        .admin-ann-wrapper tbody tr { border-bottom: 1px solid var(--line); position: relative; }
-        .admin-ann-wrapper tbody tr:last-child { border-bottom: none; }
-        .admin-ann-wrapper tbody tr:hover { background: #fbfaff; }
-        .admin-ann-wrapper td { padding: 14px 16px; font-size: 14px; vertical-align: top; }
-        .admin-ann-wrapper td.stripe-cell { width: 6px; padding: 0; }
-        .admin-ann-wrapper .stripe { width: 5px; height: 100%; position: absolute; left: 0; top: 0; bottom: 0; }
-        .admin-ann-wrapper .title-cell { max-width: 340px; }
-        .admin-ann-wrapper .title-cell .t { font-weight: 700; font-size: 14.5px; margin-bottom: 3px; }
-        .admin-ann-wrapper .title-cell .d { color: var(--ink-soft); font-size: 13px; line-height: 1.4; }
-        .admin-ann-wrapper .badge { display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: .03em; padding: 4px 9px; border-radius: 999px; text-transform: uppercase; }
-        .admin-ann-wrapper .badge.Important { background: var(--rose-bg); color: var(--rose); }
-        .admin-ann-wrapper .badge.Event { background: var(--teal-bg); color: var(--teal); }
-        .admin-ann-wrapper .badge.Course { background: #ecebfd; color: var(--indigo); }
-        .admin-ann-wrapper .badge.System { background: var(--slate-bg); color: var(--slate); }
-        .admin-ann-wrapper .meta { color: var(--ink-soft); font-size: 12.5px; }
-        .admin-ann-wrapper .pin-toggle { background: none; border: none; cursor: pointer; font-size: 16px; color: #cfcbe4; transition: color 0.2s; }
-        .admin-ann-wrapper .pin-toggle.pinned { color: var(--amber); }
-        .admin-ann-wrapper .row-actions { display: flex; gap: 10px; }
-        .admin-ann-wrapper .row-actions button { border: none; background: none; cursor: pointer; font-size: 12.5px; font-weight: 600; color: var(--indigo); padding: 0; transition: color 0.2s; }
-        .admin-ann-wrapper .row-actions button.del { color: var(--rose); }
-        .admin-ann-wrapper .empty { padding: 50px 20px; text-align: center; color: var(--ink-soft); }
-      `}</style>
-      
-      <div className="admin-ann-wrapper">
-        <div className="shell">
-          <div className="topbar">
-            <div>
-              <div className="eyebrow">Student · Chemy LMS · Admin</div>
-              <h1>Announcements</h1>
-              <p className="sub">Create, pin, and manage everything students see on their announcement feed.</p>
-            </div>
-            <button className="new-btn" onClick={openModal}>+ New announcement</button>
-          </div>
-
-          <div className="stats">
-            <div className="stat total"><div className="n">{stats.total}</div><div className="l">Total</div></div>
-            <div className="stat important"><div className="n">{stats.important}</div><div className="l">Important</div></div>
-            <div className="stat week"><div className="n">{stats.week}</div><div className="l">This week</div></div>
-            <div className="stat pinned"><div className="n">{stats.pinned}</div><div className="l">Pinned</div></div>
-          </div>
-
-          <div className="filters">
-            {['All', 'Important', 'Event', 'Course', 'System'].map(f => (
-              <button 
-                key={f}
-                className={activeFilter === f ? 'active' : ''} 
-                onClick={() => setActiveFilter(f)}
-              >
-                {f === 'Event' ? 'Events' : f === 'Course' ? 'Courses' : f}
-              </button>
-            ))}
-          </div>
-
-          <table>
-            <thead>
-              <tr>
-                <th style={{width: 6}}></th>
-                <th>Announcement</th>
-                <th>Category</th>
-                <th>Author</th>
-                <th>Posted</th>
-                <th>Pinned</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {list.length === 0 ? (
-                <tr>
-                  <td colSpan="7">
-                    <div className="empty">No announcements in this category yet. Use "New announcement" to add one.</div>
-                  </td>
-                </tr>
-              ) : (
-                list.map(a => (
-                  <tr key={a.id}>
-                    <td className="stripe-cell"><div className="stripe" style={{background: stripeColor(a.cat)}}></div></td>
-                    <td className="title-cell"><div className="t">{a.title}</div><div className="d">{a.desc}</div></td>
-                    <td><span className={`badge ${a.cat}`}>{a.cat}</span></td>
-                    <td className="meta">{a.author}</td>
-                    <td className="meta">{a.posted}</td>
-                    <td>
-                      <button className={`pin-toggle ${a.pinned ? 'pinned' : ''}`} onClick={() => togglePin(a.id)}>
-                        {a.pinned ? '★' : '☆'}
-                      </button>
-                    </td>
-                    <td>
-                      <div className="row-actions">
-                        <button onClick={() => editRow(a.id)}>Edit</button>
-                        <button className="del" onClick={() => deleteRow(a.id)}>Delete</button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+    <div>
+      <SectionHeader title="Featured announcement" subtitle="The large banner shown at the top of the Announcements page." onAdd={openEdit} addLabel="Edit banner" />
+      <div className="rounded-2xl bg-gradient-to-br from-indigo-600 to-blue-600 p-6 text-white shadow-sm">
+        <div className="mb-3 flex flex-wrap gap-2">
+          {featured.badges.map((b) => (
+            <span key={b} className="rounded-full bg-white/15 px-3 py-1 text-xs font-medium">{b}</span>
+          ))}
         </div>
-
-        <NewAnnouncementModal
-          open={isModalOpen}
-          onClose={closeModal}
-          onSave={save}
-          editingItem={editId ? modalForm : null}
-          key={isModalOpen ? (editId || "new") : "closed"}
-        />
+        <h3 className="text-xl font-semibold">{featured.emoji} {featured.title}</h3>
+        <p className="mt-2 max-w-xl text-sm text-white/85">{featured.description}</p>
+        <p className="mt-4 text-xs text-white/70">{featured.author} · {new Date(featured.date).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}</p>
+        <span className="mt-4 inline-block rounded-full bg-white px-4 py-2 text-sm font-semibold text-indigo-600">{featured.ctaLabel} →</span>
       </div>
-    </>
+
+      {open && (
+        <Modal title="Edit featured announcement" onClose={() => setOpen(false)} onSave={save}>
+          <Field label="Badges (comma separated)">
+            <input className={inputCls} value={draft.badges.join(", ")} onChange={(e) => setDraft({ ...draft, badges: e.target.value.split(",").map((s) => s.trim()).filter(Boolean) })} placeholder="Featured, Course update" />
+          </Field>
+          <Field label="Emoji"><input className={inputCls} value={draft.emoji} onChange={(e) => setDraft({ ...draft, emoji: e.target.value })} placeholder="📊" /></Field>
+          <Field label="Title"><input className={inputCls} value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} /></Field>
+          <Field label="Description"><textarea rows={3} className={inputCls} value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} /></Field>
+          <div className="grid grid-cols-2 gap-4">
+            <Field label="Posted by"><input className={inputCls} value={draft.author} onChange={(e) => setDraft({ ...draft, author: e.target.value })} /></Field>
+            <Field label="Date"><input type="date" className={inputCls} value={draft.date} onChange={(e) => setDraft({ ...draft, date: e.target.value })} /></Field>
+          </div>
+          <Field label="Button label"><input className={inputCls} value={draft.ctaLabel} onChange={(e) => setDraft({ ...draft, ctaLabel: e.target.value })} placeholder="View course" /></Field>
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// 2. Announcements list — full CRUD, filterable, pin toggle
+// ---------------------------------------------------------------------------
+
+const emptyAnnouncement = { category: "Important", title: "", description: "", author: "", postedAgo: "Just now", pinned: false };
+
+function AnnouncementsSection({ items, setItems }) {
+  const [filter, setFilter] = useState("All");
+  const [editing, setEditing] = useState(null);
+  const [draft, setDraft] = useState(null);
+
+  const openEdit = (item) => { setEditing(item.id); setDraft({ ...item }); };
+  const openNew = () => { setEditing("new"); setDraft({ ...emptyAnnouncement }); };
+  const save = () => {
+    if (!draft.title) return;
+    setItems((prev) => (editing === "new" ? [{ ...draft, id: uid("an") }, ...prev] : prev.map((i) => (i.id === draft.id ? draft : i))));
+    setEditing(null);
+  };
+  const remove = (id) => setItems((prev) => prev.filter((i) => i.id !== id));
+  const togglePin = (id) => setItems((prev) => prev.map((i) => (i.id === id ? { ...i, pinned: !i.pinned } : i)));
+
+  const filtered = filter === "All" ? items : items.filter((i) => i.category === filter);
+
+  return (
+    <div>
+      <SectionHeader title="Announcements" subtitle="Everything students see in the feed, in the order it happened." onAdd={openNew} addLabel="Add announcement" />
+
+      <div className="mb-4 flex flex-wrap gap-2">
+        {["All", ...CATEGORIES].map((c) => (
+          <button key={c} onClick={() => setFilter(c)} className={`rounded-full px-4 py-1.5 text-sm font-medium ${filter === c ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-500 hover:bg-slate-200"}`}>
+            {c}
+          </button>
+        ))}
+      </div>
+
+      <div className="space-y-3">
+        {filtered.map((a) => (
+          <div key={a.id} className="group relative rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
+            <div className="mb-1 flex items-center gap-2">
+              <span className={`h-1.5 w-1.5 rounded-full ${categoryDot[a.category]}`} />
+              <span className={`text-xs font-semibold uppercase tracking-wide ${categoryText[a.category]}`}>{a.category}</span>
+              {a.pinned && <Pin size={12} className="text-rose-400" />}
+            </div>
+            <h4 className="pr-20 text-base font-semibold text-slate-800">{a.title}</h4>
+            <p className="mt-1 text-sm text-slate-500">{a.description}</p>
+            <p className="mt-3 text-xs text-slate-400">{a.postedAgo} · By {a.author}</p>
+            <RowActions
+              onEdit={() => openEdit(a)}
+              onDelete={() => remove(a.id)}
+              extra={
+                <button onClick={() => togglePin(a.id)} className="rounded-lg bg-slate-100 p-1.5 text-slate-500 hover:bg-slate-200">
+                  {a.pinned ? <PinOff size={14} /> : <Pin size={14} />}
+                </button>
+              }
+            />
+          </div>
+        ))}
+        {filtered.length === 0 && <EmptyRow text="No announcements in this category yet." />}
+      </div>
+
+      {editing && (
+        <Modal title={editing === "new" ? "Add announcement" : "Edit announcement"} onClose={() => setEditing(null)} onSave={save}>
+          <Field label="Category">
+            <select className={inputCls} value={draft.category} onChange={(e) => setDraft({ ...draft, category: e.target.value })}>
+              {CATEGORIES.map((c) => <option key={c}>{c}</option>)}
+            </select>
+          </Field>
+          <Field label="Title"><input className={inputCls} value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} placeholder="Practical exam venue changed for Day 3" /></Field>
+          <Field label="Description"><textarea rows={3} className={inputCls} value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} /></Field>
+          <div className="grid grid-cols-2 gap-4">
+            <Field label="Posted by"><input className={inputCls} value={draft.author} onChange={(e) => setDraft({ ...draft, author: e.target.value })} placeholder="Examination Office" /></Field>
+            <Field label="Posted"><input className={inputCls} value={draft.postedAgo} onChange={(e) => setDraft({ ...draft, postedAgo: e.target.value })} placeholder="2 hours ago" /></Field>
+          </div>
+          <label className="flex items-center gap-2 text-sm text-slate-600">
+            <input type="checkbox" checked={draft.pinned} onChange={(e) => setDraft({ ...draft, pinned: e.target.checked })} />
+            Pin this announcement
+          </label>
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// 3. Quick links — CRUD for the sidebar shortcuts
+// ---------------------------------------------------------------------------
+
+function QuickLinksSection({ items, setItems }) {
+  const [editing, setEditing] = useState(null);
+  const [draft, setDraft] = useState(null);
+  const openEdit = (item) => { setEditing(item.id); setDraft({ ...item }); };
+  const openNew = () => { setEditing("new"); setDraft({ id: uid("q"), title: "", subtitle: "" }); };
+  const save = () => {
+    if (!draft.title) return;
+    setItems((prev) => (editing === "new" ? [...prev, draft] : prev.map((i) => (i.id === draft.id ? draft : i))));
+    setEditing(null);
+  };
+  const remove = (id) => setItems((prev) => prev.filter((i) => i.id !== id));
+
+  return (
+    <div>
+      <SectionHeader title="Quick links" subtitle="Shortcut list shown in the sidebar of the Announcements page." onAdd={openNew} addLabel="Add link" />
+      <div className="space-y-3">
+        {items.map((q) => (
+          <div key={q.id} className="group relative flex items-center gap-3 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600"><Link2 size={16} /></div>
+            <div className="flex-1 pr-16">
+              <p className="text-sm font-semibold text-slate-800">{q.title}</p>
+              <p className="text-xs text-slate-400">{q.subtitle}</p>
+            </div>
+            <RowActions onEdit={() => openEdit(q)} onDelete={() => remove(q.id)} />
+          </div>
+        ))}
+        {items.length === 0 && <EmptyRow text="No quick links yet." />}
+      </div>
+      {editing && (
+        <Modal title={editing === "new" ? "Add quick link" : "Edit quick link"} onClose={() => setEditing(null)} onSave={save}>
+          <Field label="Title"><input className={inputCls} value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} placeholder="Academic calendar" /></Field>
+          <Field label="Subtitle"><input className={inputCls} value={draft.subtitle} onChange={(e) => setDraft({ ...draft, subtitle: e.target.value })} placeholder="View important dates and deadlines" /></Field>
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// stats — auto-computed from the announcements list, read-only
+// ---------------------------------------------------------------------------
+
+function StatsBar({ items }) {
+  const stats = useMemo(() => ([
+    { label: "Total", value: items.length, tone: "bg-indigo-50 text-indigo-600" },
+    { label: "Important", value: items.filter((i) => i.category === "Important").length, tone: "bg-amber-50 text-amber-600" },
+    { label: "This week", value: items.filter((i) => /hour|today|yesterday/i.test(i.postedAgo)).length, tone: "bg-emerald-50 text-emerald-600" },
+    { label: "Pinned", value: items.filter((i) => i.pinned).length, tone: "bg-rose-50 text-rose-600" },
+  ]), [items]);
+
+  return (
+    <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+      {stats.map((s) => (
+        <div key={s.label} className={`rounded-2xl p-4 ${s.tone}`}>
+          <p className="text-2xl font-semibold">{s.value}</p>
+          <p className="text-xs font-medium opacity-80">{s.label}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// app shell
+// ---------------------------------------------------------------------------
+
+const SIDE_NAV = [
+  { label: "Dashboard", icon: LayoutDashboard },
+  { label: "Hackathon Manager", icon: FileText },
+  { label: "User Management", icon: Users },
+  { label: "Course Management", icon: BookOpen },
+  { label: "Live Learning", icon: Video },
+  { label: "University Practical", icon: ClipboardList },
+  { label: "Announcement Management", icon: Bell, active: true },
+  { label: "Certificates", icon: Award },
+  { label: "Student Feedback", icon: Mail },
+  { label: "Portal Settings", icon: Settings },
+];
+
+const TABS = [
+  { id: "featured", label: "Featured banner" },
+  { id: "announcements", label: "Announcements" },
+  { id: "links", label: "Quick links" },
+];
+
+export default function AnnouncementManager() {
+  const [tab, setTab] = useState("announcements");
+  const [featured, setFeatured] = useState(initialFeatured);
+  const [announcements, setAnnouncements] = useState(initialAnnouncements);
+  const [quickLinks, setQuickLinks] = useState(initialQuickLinks);
+
+  return (
+    <div className="p-8 w-full text-slate-800">
+      <div className="mb-6 flex items-center gap-2">
+        <Megaphone size={20} className="text-indigo-500" />
+        <h1 className="text-xl font-semibold text-slate-800">Announcement Management</h1>
+      </div>
+
+      <div className="mb-6">
+        <StatsBar items={announcements} />
+      </div>
+
+      <div className="mb-6 flex flex-wrap gap-2 border-b border-slate-200 pb-3">
+        {TABS.map((t) => (
+          <button key={t.id} onClick={() => setTab(t.id)} className={`rounded-lg px-4 py-2 text-sm font-medium ${tab === t.id ? "bg-indigo-600 text-white" : "text-slate-500 hover:bg-slate-100"}`}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {tab === "featured" && <FeaturedSection featured={featured} setFeatured={setFeatured} />}
+      {tab === "announcements" && <AnnouncementsSection items={announcements} setItems={setAnnouncements} />}
+      {tab === "links" && <QuickLinksSection items={quickLinks} setItems={setQuickLinks} />}
+    </div>
   );
 }
