@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   LogOut,
@@ -27,9 +27,27 @@ import {
   MessageCircle,
   Users2,
   ClipboardList,
+  Bell,
+  Trophy,
+  Moon,
+  ChevronDown,
+  Clock,
+  ShieldCheck,
+  Award,
+  CalendarPlus,
+  BarChart3,
+  UserPlus,
+  ArrowUpRight,
+  GraduationCap,
+  FileBadge,
+  Wand2,
+  PenLine,
+  Download,
+  Filter,
 } from 'lucide-react';
 import BrandLogo from '../components/BrandLogo';
 import AdminPracticalExamination from './AdminPracticalExamination';
+import AdminAnnouncements from './AdminAnnouncements';
 
 const MENU_ITEMS = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -38,6 +56,8 @@ const MENU_ITEMS = [
   { id: 'courses', label: 'Course Management', icon: BookOpen },
   { id: 'live-learning', label: 'Live Learning', icon: Video },
   { id: 'university-practical', label: 'University Practical', icon: ClipboardList },
+  { id: 'announcement-management', label: 'Announcement Management', icon: Bell },
+  { id: 'certificates', label: 'Certificates', icon: GraduationCap },
   { id: 'feedback', label: 'Student Feedback', icon: Mail },
   { id: 'settings', label: 'Portal Settings', icon: Settings },
 ];
@@ -109,6 +129,22 @@ export default function AdminPortal() {
   const [feedbackDrafts, setFeedbackDrafts] = useState({});
   const [feedbackSendingId, setFeedbackSendingId] = useState(null);
   const [feedbackError, setFeedbackError] = useState('');
+
+  // CERTIFICATES
+  const [certModalOpen, setCertModalOpen] = useState(false);
+  const [certMode, setCertMode] = useState('auto'); // 'auto' | 'manual'
+  const [certSearch, setCertSearch] = useState('');
+  const [certFilter, setCertFilter] = useState('all'); // 'all' | 'issued' | 'draft' | 'pending'
+  const [certList, setCertList] = useState([
+    { id: 'CERT-001', recipient: 'Arjun Mehta',    course: 'Data Structures',  date: '2026-06-15', issuer: 'Prof. Menon',    serial: 'NM-2026-001', status: 'issued' },
+    { id: 'CERT-002', recipient: 'Priya Sharma',   course: 'Machine Learning', date: '2026-06-20', issuer: 'Prof. Rao',      serial: 'NM-2026-002', status: 'issued' },
+    { id: 'CERT-003', recipient: 'Ravi Kumar',     course: 'Web Development',  date: '2026-07-01', issuer: 'Prof. Menon',    serial: 'NM-2026-003', status: 'draft'  },
+    { id: 'CERT-004', recipient: 'Sneha Iyer',     course: 'EV Design Sprint', date: '2026-07-10', issuer: 'Career Services',serial: 'NM-2026-004', status: 'pending'},
+  ]);
+  const [certForm, setCertForm] = useState({ recipient: '', course: '', date: '', issuer: '', serial: '', template: 'standard' });
+  const [autoTemplate, setAutoTemplate] = useState('standard');
+  const [autoRecipientGroup, setAutoRecipientGroup] = useState('all-students');
+  const [certSaved, setCertSaved] = useState(false);
 
   // Settings
   const [settingsBrand, setSettingsBrand] = useState('Chemy LMS');
@@ -475,8 +511,8 @@ export default function AdminPortal() {
       <div 
         className="bg-white border-r border-slate-200 transition-transform duration-300 flex flex-col z-20"
         style={{
-          width: 260,
-          minWidth: 260,
+          width: 280,
+          minWidth: 280,
           position: isMobile ? 'fixed' : 'relative',
           height: '100%',
           top: 0,
@@ -487,7 +523,7 @@ export default function AdminPortal() {
       >
         <div className="p-5 border-b border-slate-100">
           <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-[#0B3D91] to-indigo-500" />
+            <img src="/src/assets/chemy-logo.png" alt="Chemy Logo" style={{ width: 32, height: 32, objectFit: 'contain', display: 'block' }} />
             <span className="text-gray-900 text-lg font-semibold tracking-wide" style={{ fontFamily: "'Playfair Display', serif" }}>
               Chemy
             </span>
@@ -512,8 +548,8 @@ export default function AdminPortal() {
                     : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'
                 }`}
               >
-                <Icon size={18} />
-                <span>{item.label}</span>
+                <Icon size={18} className="shrink-0" />
+                <span className="text-left leading-snug">{item.label}</span>
               </button>
             );
           })}
@@ -552,62 +588,419 @@ export default function AdminPortal() {
 
         <div className="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8 min-w-0">
           {activeTab === 'dashboard' && (
-            <div className="max-w-6xl mx-auto space-y-8">
-              <div>
-                <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 text-left">Dashboard Overview</h1>
-                <p className="text-sm text-slate-500 mt-1 text-left font-semibold">Real-time status metrics of Chemy LMS portal operations.</p>
+            <div className="max-w-6xl mx-auto">
+              {/* Header row */}
+              <div className="flex items-start justify-between flex-wrap gap-4 mb-8">
+                <div>
+                  <h1 className="text-2xl font-bold text-slate-900">Dashboard Overview</h1>
+                  <p className="text-slate-500 text-sm mt-1">Real-time status metrics of Chemy LMS portal operations.</p>
+                </div>
+                <div className="flex items-center gap-2 border border-slate-200 rounded-xl px-4 py-2.5 bg-white text-sm text-slate-600 font-medium">
+                  <Calendar size={16} className="text-slate-400" />
+                  {new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
+                </div>
               </div>
 
-              <div className="grid gap-5 grid-cols-2 lg:grid-cols-4">
+              {/* Stat cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-6">
                 {[
-                  { label: 'Active Users', value: dbStats.totalUsers, icon: Users, color: 'text-blue-600', bg: 'bg-blue-50' },
-                  { label: 'Enrolled Courses', value: dbStats.activeCourses, icon: BookOpen, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-                  { label: 'Live Classes', value: dbStats.liveSessions, icon: Video, color: 'text-amber-500', bg: 'bg-amber-50' },
-                  { label: 'Hackathons', value: dbStats.hackathons, icon: FileText, color: 'text-purple-600', bg: 'bg-purple-50' }
-                ].map((stat, idx) => {
-                  const Icon = stat.icon;
+                  { label: 'Active Users',     value: dbStats.totalUsers,    icon: Users,    color: 'bg-blue-500',    bar: 'bg-blue-500' },
+                  { label: 'Enrolled Courses', value: dbStats.activeCourses, icon: BookOpen, color: 'bg-emerald-500', bar: 'bg-emerald-500' },
+                  { label: 'Live Classes',     value: dbStats.liveSessions,  icon: Video,    color: 'bg-orange-500',  bar: 'bg-orange-500' },
+                  { label: 'Hackathons',       value: dbStats.hackathons,    icon: Trophy,   color: 'bg-violet-500',  bar: 'bg-violet-500' },
+                ].map((s) => {
+                  const Icon = s.icon;
                   return (
-                    <div key={idx} className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex items-center gap-4">
-                      <div className={`p-3.5 rounded-xl ${stat.bg} ${stat.color}`}>
-                        <Icon size={20} />
+                    <div key={s.label} className="bg-white rounded-2xl border border-slate-100 p-5 shadow-sm relative overflow-hidden">
+                      <div className={`w-12 h-12 rounded-xl ${s.color} flex items-center justify-center text-white mb-4`}>
+                        <Icon size={22} />
                       </div>
-                      <div className="text-left">
-                        <p className="text-2xl font-extrabold text-slate-900">{stat.value}</p>
-                        <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mt-0.5">{stat.label}</p>
-                      </div>
+                      <div className="text-slate-500 text-sm mb-1">{s.label}</div>
+                      <div className="text-3xl font-bold text-slate-900 mb-2">{s.value}</div>
+                      <div className={`absolute bottom-0 left-0 h-1 w-full ${s.bar}`} />
                     </div>
                   );
                 })}
               </div>
 
-              <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 space-y-6">
-                <div>
-                  <h3 className="text-lg font-bold text-slate-900 text-left">Slide Showcase Images</h3>
-                  <p className="text-xs text-slate-500 text-left font-semibold mt-1">Upload pictures to update the student showcase slideshow.</p>
+              {/* Welcome banner */}
+              <div className="bg-white rounded-2xl border border-slate-100 p-8 mb-6 shadow-sm flex items-center gap-8 flex-wrap">
+                <div className="w-40 h-32 rounded-xl bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center shrink-0">
+                  <BarChart3 size={48} className="text-blue-400" />
                 </div>
-                <div className="max-w-md space-y-3">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    onChange={handleFileSelection}
-                    className="w-full rounded-xl border border-slate-200 p-2 text-xs bg-white cursor-pointer"
-                  />
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-slate-400 font-semibold">{selectedFiles.length} files selected</span>
-                    <button
-                      type="button"
-                      onClick={handleHackathonUpload}
-                      disabled={uploading}
-                      className="px-5 py-2 text-xs font-bold text-white bg-slate-950 rounded-xl hover:bg-slate-800 disabled:opacity-50"
-                    >
-                      {uploading ? 'Uploading...' : 'Upload Images'}
-                    </button>
+                <div className="flex-1 min-w-[260px]">
+                  <h2 className="text-lg font-bold text-slate-900 mb-2">Welcome back, Admin! 👋</h2>
+                  <p className="text-slate-500 text-sm mb-5 leading-relaxed">
+                    Here's what's happening with your LMS platform today. Monitor activities, manage users and courses, and track performance in real-time.
+                  </p>
+                  <div className="flex flex-wrap gap-6">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center"><Clock size={16} /></div>
+                      <div>
+                        <div className="text-sm font-semibold text-slate-800">Real-time Monitoring</div>
+                        <div className="text-xs text-slate-400">Track live platform activities</div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-lg bg-violet-50 text-violet-600 flex items-center justify-center"><Sparkles size={16} /></div>
+                      <div>
+                        <div className="text-sm font-semibold text-slate-800">Smart Insights</div>
+                        <div className="text-xs text-slate-400">Get AI-powered analytics</div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center"><ShieldCheck size={16} /></div>
+                      <div>
+                        <div className="text-sm font-semibold text-slate-800">Secure & Reliable</div>
+                        <div className="text-xs text-slate-400">Your data is always protected</div>
+                      </div>
+                    </div>
                   </div>
-                  {uploadMessage && <p className="text-xs text-emerald-600 font-bold mt-1 text-left">{uploadMessage}</p>}
-                  {uploadError && <p className="text-xs text-rose-600 font-bold mt-1 text-left">{uploadError}</p>}
                 </div>
               </div>
+
+              {/* Quick Links + Recent Activities */}
+              <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.3fr] gap-5">
+                <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm">
+                  <h3 className="font-bold text-slate-900 mb-4">Quick Links</h3>
+                  <div className="grid grid-cols-2 gap-3">
+                    {[
+                      { label: 'Add New Course',      icon: BookOpen,    tint: 'text-emerald-600 bg-emerald-50', tab: 'courses' },
+                      { label: 'Create Hackathon',    icon: Award,       tint: 'text-violet-600 bg-violet-50',   tab: 'hackathons' },
+                      { label: 'Schedule Live Class', icon: CalendarPlus,tint: 'text-orange-600 bg-orange-50',   tab: 'live-learning' },
+                      { label: 'User Management',     icon: Users,       tint: 'text-blue-600 bg-blue-50',       tab: 'users' },
+                    ].map((q) => {
+                      const Icon = q.icon;
+                      return (
+                        <button
+                          key={q.label}
+                          onClick={() => setActiveTab(q.tab)}
+                          className="flex flex-col items-center justify-center gap-2 border border-slate-100 rounded-xl py-5 hover:border-slate-200 hover:shadow-sm transition"
+                        >
+                          <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${q.tint}`}><Icon size={18} /></div>
+                          <span className="text-xs font-medium text-slate-700 text-center px-1">{q.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="font-bold text-slate-900">Recent Activities</h3>
+                  </div>
+                  <div className="flex flex-col gap-4">
+                    {[
+                      { title: 'Active Users loaded',    detail: `${dbStats.totalUsers} users on the platform`,      time: 'Just now',    icon: UserPlus, tint: 'text-emerald-600 bg-emerald-50' },
+                      { title: 'Live sessions running',  detail: `${dbStats.liveSessions} sessions currently active`, time: 'Just now',    icon: Video,    tint: 'text-orange-600 bg-orange-50' },
+                      { title: 'Courses available',      detail: `${dbStats.activeCourses} enrolled courses`,         time: 'Just now',    icon: BookOpen, tint: 'text-blue-600 bg-blue-50' },
+                      { title: 'Hackathons published',   detail: `${dbStats.hackathons} active hackathons`,           time: 'Just now',    icon: Trophy,   tint: 'text-violet-600 bg-violet-50' },
+                    ].map((a) => {
+                      const Icon = a.icon;
+                      return (
+                        <div key={a.title} className="flex items-center gap-3">
+                          <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${a.tint}`}><Icon size={16} /></div>
+                          <div className="flex-1">
+                            <div className="text-sm font-semibold text-slate-800">{a.title}</div>
+                            <div className="text-xs text-slate-400">{a.detail}</div>
+                          </div>
+                          <div className="text-xs text-slate-400 shrink-0">{a.time}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'certificates' && (
+            <div className="max-w-6xl mx-auto">
+              {/* Page header */}
+              <div className="flex items-center justify-between flex-wrap gap-4 mb-8">
+                <div>
+                  <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2"><GraduationCap size={26} className="text-blue-600" /> Certificates</h1>
+                  <p className="text-slate-500 text-sm mt-1">Issue, manage, and track course completion certificates.</p>
+                </div>
+                <button
+                  onClick={() => { setCertModalOpen(true); setCertSaved(false); setCertForm({ recipient: '', course: '', date: '', issuer: '', serial: `NM-${new Date().getFullYear()}-${String(certList.length + 1).padStart(3,'0')}`, template: 'standard' }); }}
+                  className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-xl shadow-md transition"
+                >
+                  <FileBadge size={16} /> New Certificate
+                </button>
+              </div>
+
+              {/* Search + Filter bar */}
+              <div className="flex flex-wrap items-center gap-3 mb-6">
+                <div className="relative flex-1 min-w-[200px]">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
+                  <input
+                    type="text"
+                    placeholder="Search by recipient, course, or serial..."
+                    value={certSearch}
+                    onChange={(e) => setCertSearch(e.target.value)}
+                    className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-xl text-xs focus:outline-none"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  {['all','issued','draft','pending'].map(f => (
+                    <button
+                      key={f}
+                      onClick={() => setCertFilter(f)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold capitalize transition border ${
+                        certFilter === f
+                          ? 'bg-blue-600 text-white border-blue-600'
+                          : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'
+                      }`}
+                    >{f === 'all' ? 'All' : f.charAt(0).toUpperCase() + f.slice(1)}</button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Certificate list */}
+              <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-slate-50 text-slate-500 text-xs font-bold border-b border-slate-200">
+                      <th className="p-4">Serial</th>
+                      <th className="p-4">Recipient</th>
+                      <th className="p-4">Course</th>
+                      <th className="p-4">Issuer</th>
+                      <th className="p-4">Date</th>
+                      <th className="p-4">Status</th>
+                      <th className="p-4">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {certList
+                      .filter(c => certFilter === 'all' || c.status === certFilter)
+                      .filter(c => !certSearch ||
+                        c.recipient.toLowerCase().includes(certSearch.toLowerCase()) ||
+                        c.course.toLowerCase().includes(certSearch.toLowerCase()) ||
+                        c.serial.toLowerCase().includes(certSearch.toLowerCase())
+                      )
+                      .map(c => (
+                        <tr key={c.id} className="border-b border-slate-100 hover:bg-slate-50 transition">
+                          <td className="p-4 text-xs font-mono text-slate-500">{c.serial}</td>
+                          <td className="p-4 text-sm font-semibold text-slate-800">{c.recipient}</td>
+                          <td className="p-4 text-xs text-slate-500">{c.course}</td>
+                          <td className="p-4 text-xs text-slate-500">{c.issuer}</td>
+                          <td className="p-4 text-xs text-slate-400">{c.date}</td>
+                          <td className="p-4">
+                            <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase ${
+                              c.status === 'issued'  ? 'bg-emerald-50 text-emerald-600' :
+                              c.status === 'draft'   ? 'bg-amber-50 text-amber-600' :
+                              'bg-slate-100 text-slate-500'
+                            }`}>{c.status}</span>
+                          </td>
+                          <td className="p-4">
+                            <div className="flex items-center gap-3">
+                              <button
+                                onClick={() => alert(`Downloading certificate for ${c.recipient}`)}
+                                className="flex items-center gap-1 text-xs font-semibold text-blue-600 hover:text-blue-800 transition"
+                              >
+                                <Download size={13} /> Download
+                              </button>
+                              <button
+                                onClick={() => setCertList(prev => prev.filter(x => x.id !== c.id))}
+                                className="text-xs font-semibold text-rose-500 hover:text-rose-700 transition"
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    }
+                    {certList.filter(c => certFilter === 'all' || c.status === certFilter).length === 0 && (
+                      <tr><td colSpan={7} className="p-8 text-center text-xs text-slate-400">No certificates found.</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* New Certificate Modal */}
+              {certModalOpen && (
+                <div
+                  className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
+                  onClick={(e) => { if (e.target === e.currentTarget) setCertModalOpen(false); }}
+                >
+                  <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden">
+                    {/* Modal header */}
+                    <div className="flex items-center justify-between px-7 py-5 border-b border-slate-100">
+                      <div className="flex items-center gap-2">
+                        <FileBadge size={20} className="text-blue-600" />
+                        <h2 className="text-base font-bold text-slate-900">New Certificate</h2>
+                      </div>
+                      <button onClick={() => setCertModalOpen(false)} className="text-slate-400 hover:text-slate-600 text-xl font-bold">×</button>
+                    </div>
+
+                    {/* Mode tabs */}
+                    <div className="flex gap-1 px-7 pt-5">
+                      {[{id:'auto', label:'Automatic Generation', icon: Wand2}, {id:'manual', label:'Manual Creation', icon: PenLine}].map(m => (
+                        <button
+                          key={m.id}
+                          onClick={() => setCertMode(m.id)}
+                          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition border ${
+                            certMode === m.id
+                              ? 'bg-blue-600 text-white border-blue-600'
+                              : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'
+                          }`}
+                        >
+                          <m.icon size={14} /> {m.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className="px-7 py-6 space-y-4">
+                      {certMode === 'auto' ? (
+                        <>
+                          <p className="text-xs text-slate-500">Select a template and recipient group. Certificates will be auto-generated with data pulled from enrolled courses and user records.</p>
+                          <div>
+                            <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Template</label>
+                            <select
+                              value={autoTemplate}
+                              onChange={e => setAutoTemplate(e.target.value)}
+                              className="w-full px-4 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none"
+                            >
+                              <option value="standard">Standard Completion</option>
+                              <option value="excellence">Excellence Award</option>
+                              <option value="hackathon">Hackathon Participation</option>
+                              <option value="internship">Internship Certificate</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Recipient Group</label>
+                            <select
+                              value={autoRecipientGroup}
+                              onChange={e => setAutoRecipientGroup(e.target.value)}
+                              className="w-full px-4 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none"
+                            >
+                              <option value="all-students">All Students</option>
+                              <option value="course-completers">Course Completers Only</option>
+                              <option value="hackathon-participants">Hackathon Participants</option>
+                              <option value="top-performers">Top Performers (Rank ≤ 10)</option>
+                            </select>
+                          </div>
+                          <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 text-xs text-blue-700">
+                            <strong>Auto-fill rules:</strong> Recipient name from user profile · Course from enrollment records · Date = today · Issuer = portal admin · Serial auto-incremented.
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <p className="text-xs text-slate-500">Fill in all fields manually. All inputs are validated before saving.</p>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                              <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Recipient Name *</label>
+                              <input
+                                placeholder="e.g. Arjun Mehta"
+                                value={certForm.recipient}
+                                onChange={e => setCertForm(p => ({...p, recipient: e.target.value}))}
+                                className="w-full px-4 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Course / Program *</label>
+                              <input
+                                placeholder="e.g. Data Structures"
+                                value={certForm.course}
+                                onChange={e => setCertForm(p => ({...p, course: e.target.value}))}
+                                className="w-full px-4 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Issue Date *</label>
+                              <input
+                                type="date"
+                                value={certForm.date}
+                                onChange={e => setCertForm(p => ({...p, date: e.target.value}))}
+                                className="w-full px-4 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Issuer</label>
+                              <input
+                                placeholder="e.g. Prof. Menon"
+                                value={certForm.issuer}
+                                onChange={e => setCertForm(p => ({...p, issuer: e.target.value}))}
+                                className="w-full px-4 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Serial No.</label>
+                              <input
+                                value={certForm.serial}
+                                onChange={e => setCertForm(p => ({...p, serial: e.target.value}))}
+                                className="w-full px-4 py-2 border border-slate-200 rounded-xl text-sm font-mono focus:outline-none"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-bold text-slate-600 uppercase mb-1">Template</label>
+                              <select
+                                value={certForm.template}
+                                onChange={e => setCertForm(p => ({...p, template: e.target.value}))}
+                                className="w-full px-4 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none"
+                              >
+                                <option value="standard">Standard Completion</option>
+                                <option value="excellence">Excellence Award</option>
+                                <option value="hackathon">Hackathon Participation</option>
+                                <option value="internship">Internship Certificate</option>
+                              </select>
+                            </div>
+                          </div>
+                        </>
+                      )}
+
+                      {certSaved && (
+                        <div className="bg-emerald-50 border border-emerald-100 text-emerald-700 text-xs font-bold rounded-xl p-3">
+                          ✓ Certificate saved successfully!
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Modal footer */}
+                    <div className="flex justify-end gap-3 px-7 pb-6">
+                      <button onClick={() => setCertModalOpen(false)} className="px-5 py-2 rounded-xl text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200">Cancel</button>
+                      <button
+                        onClick={() => {
+                          if (certMode === 'manual') {
+                            if (!certForm.recipient.trim() || !certForm.course.trim() || !certForm.date) {
+                              alert('Please fill in Recipient, Course, and Date.');
+                              return;
+                            }
+                            const newCert = {
+                              id: `CERT-${Date.now()}`,
+                              recipient: certForm.recipient,
+                              course: certForm.course,
+                              date: certForm.date,
+                              issuer: certForm.issuer || 'Admin',
+                              serial: certForm.serial || `NM-${new Date().getFullYear()}-${String(certList.length + 1).padStart(3,'0')}`,
+                              status: 'draft',
+                            };
+                            setCertList(prev => [newCert, ...prev]);
+                          } else {
+                            const newCert = {
+                              id: `CERT-${Date.now()}`,
+                              recipient: `Auto — ${autoRecipientGroup}`,
+                              course: `Template: ${autoTemplate}`,
+                              date: new Date().toISOString().split('T')[0],
+                              issuer: adminName,
+                              serial: `NM-${new Date().getFullYear()}-${String(certList.length + 1).padStart(3,'0')}`,
+                              status: 'pending',
+                            };
+                            setCertList(prev => [newCert, ...prev]);
+                          }
+                          setCertSaved(true);
+                          setTimeout(() => { setCertModalOpen(false); setCertSaved(false); }, 1200);
+                        }}
+                        className="px-5 py-2 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-md"
+                      >
+                        {certMode === 'auto' ? 'Generate Certificates' : 'Save Certificate'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -761,6 +1154,35 @@ export default function AdminPortal() {
                       </div>
                     ))}
                   </div>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 space-y-6">
+                <div>
+                  <h3 className="text-lg font-bold text-slate-900 text-left">Slide Showcase Images</h3>
+                  <p className="text-xs text-slate-500 text-left font-semibold mt-1">Upload pictures to update the student showcase slideshow.</p>
+                </div>
+                <div className="max-w-md space-y-3">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={handleFileSelection}
+                    className="w-full rounded-xl border border-slate-200 p-2 text-xs bg-white cursor-pointer"
+                  />
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-slate-400 font-semibold">{selectedFiles.length} files selected</span>
+                    <button
+                      type="button"
+                      onClick={handleHackathonUpload}
+                      disabled={uploading}
+                      className="px-5 py-2 text-xs font-bold text-white bg-slate-950 rounded-xl hover:bg-slate-800 disabled:opacity-50"
+                    >
+                      {uploading ? 'Uploading...' : 'Upload Images'}
+                    </button>
+                  </div>
+                  {uploadMessage && <p className="text-xs text-emerald-600 font-bold mt-1 text-left">{uploadMessage}</p>}
+                  {uploadError && <p className="text-xs text-rose-600 font-bold mt-1 text-left">{uploadError}</p>}
                 </div>
               </div>
             </div>
@@ -1175,6 +1597,10 @@ export default function AdminPortal() {
 
           {activeTab === 'university-practical' && (
             <AdminPracticalExamination />
+          )}
+
+          {activeTab === 'announcement-management' && (
+            <AdminAnnouncements />
           )}
 
           {activeTab === 'settings' && (

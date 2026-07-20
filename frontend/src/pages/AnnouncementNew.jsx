@@ -1,166 +1,469 @@
-import React, { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import { ArrowLeft, Bell, Search, Loader2, AlertCircle, Bookmark } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronRight, BookmarkIcon, Bell } from 'lucide-react';
+import announcementService from '../services/announcementService';
 
-const announcements = [
-  {
-    id: 1,
-    category: 'IMPORTANT',
-    type: 'important',
-    dotColor: '#f2994a',
-    textColor: '#d97706',
-    title: 'Practical exam venue changed for Day 3',
-    description: 'The Analytics Lab session on 22 Jul 2026 has moved to Lab Block A – 305. Please update your calendar.',
-    time: '2 hours ago',
-    by: 'Examination Office',
-    pinned: true,
-  },
-  {
-    id: 2,
-    category: 'EVENT',
-    type: 'event',
-    dotColor: '#0fa39a',
-    textColor: '#0fa39a',
-    title: 'Webinar: Future of Data Science',
-    description: 'Join industry experts on 25 Jul 2026 at 4:00 PM IST for an insightful session on where the field is heading next.',
-    time: '6 hours ago',
-    by: 'Career Services',
-    pinned: false,
-  },
-  {
-    id: 3,
-    category: 'COURSE',
-    type: 'course',
-    dotColor: '#4a3aff',
-    textColor: '#4a3aff',
-    title: 'New assignment posted in Data Structures',
-    description: 'Assignment 4 covering binary trees and traversal algorithms is now available. Due 28 Jul 2026, 11:59 PM.',
-    time: 'Yesterday',
-    by: 'Prof. Menon',
-    pinned: false,
-  },
-  {
-    id: 4,
-    category: 'SYSTEM',
-    type: 'system',
-    dotColor: '#7c8291',
-    textColor: '#7c8291',
-    title: 'Scheduled maintenance this weekend',
-    description: 'The portal will be briefly unavailable on 19 Jul 2026, 1:00–2:00 AM IST, for routine maintenance.',
-    time: '2 days ago',
-    by: 'IT Support',
-    pinned: false,
-  },
-];
+const filters = ['All', 'Important', 'Events', 'Courses', 'System'];
+
+const colorMap = {
+  IMPORTANT: { dot: '#f2994a', text: '#d97706', bg: 'bg-[#fff4e7]' },
+  EVENT: { dot: '#0fa39a', text: '#0fa39a', bg: 'bg-[#e6f8f6]' },
+  COURSE: { dot: '#4a3aff', text: '#4a3aff', bg: 'bg-[#efedff]' },
+  SYSTEM: { dot: '#7c8291', text: '#7c8291', bg: 'bg-[#f1f2f5]' }
+};
+
+const categoryLabels = {
+  IMPORTANT: 'IMPORTANT',
+  EVENT: 'EVENT',
+  COURSE: 'COURSE',
+  SYSTEM: 'SYSTEM'
+};
+
+const categoryIcons = {
+  IMPORTANT: '⚠️',
+  EVENT: '🎯',
+  COURSE: '📖',
+  SYSTEM: '🔧'
+};
 
 export default function Announcement() {
   const navigate = useNavigate();
   const [activeFilter, setActiveFilter] = useState('All');
-  const [pinnedItems, setPinnedItems] = useState(
-    announcements.filter(a => a.pinned).map(a => a.id)
-  );
+  const [search, setSearch] = useState('');
+  const [announcements, setAnnouncements] = useState([]);
+  const [bookmarkedItems, setBookmarkedItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [selectedAnnouncement, setSelectedAnnouncement] = useState(null);
 
-  const filters = ['All', 'Important', 'Events', 'Courses', 'System'];
-
-  const filteredAnnouncements = announcements.filter(item => {
-    if (activeFilter === 'All') return true;
-    if (activeFilter === 'Important') return item.type === 'important';
-    if (activeFilter === 'Events') return item.type === 'event';
-    if (activeFilter === 'Courses') return item.type === 'course';
-    if (activeFilter === 'System') return item.type === 'system';
-    return true;
-  });
-
-  const togglePin = (id) => {
-    setPinnedItems(prev =>
-      prev.includes(id) ? prev.filter(p => p !== id) : [...prev, id]
-    );
+  // Load announcements from API
+  const loadAnnouncements = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      // Fetch a maximum of 100 announcements for the student board
+      const response = await announcementService.fetchAnnouncements(1, 100, null, 'newest');
+      setAnnouncements(response.data || []);
+    } catch (err) {
+      console.error('Error loading announcements:', err);
+      setError(err.message || 'Failed to load announcements');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const stats = [
-    { num: '24', label: 'Total', bgColor: 'bg-violet-100', icon: '📋' },
-    { num: '5', label: 'Important', bgColor: 'bg-amber-100', icon: '⚠️' },
-    { num: '8', label: 'This week', bgColor: 'bg-teal-100', icon: '⏱️' },
-    { num: '3', label: 'Pinned', bgColor: 'bg-slate-100', icon: '📌' },
-  ];
+  useEffect(() => {
+    loadAnnouncements();
+    // Auto-refresh every 15 seconds to ensure real-time reflection of changes
+    const interval = setInterval(loadAnnouncements, 15000);
+    return () => clearInterval(interval);
+  }, []);
 
-  const quickLinks = [
-    { title: 'Academic calendar', desc: 'View important dates and deadlines', icon: '📅' },
-    { title: 'Exam schedule', desc: 'Check upcoming exams', icon: '✓' },
-    { title: 'Assignment submission', desc: 'View pending submissions', icon: '📄' },
-  ];
+  // Load bookmarks on mount
+  useEffect(() => {
+    const savedBookmarks = JSON.parse(localStorage.getItem('studentBookmarks') || '[]');
+    setBookmarkedItems(savedBookmarks);
+  }, []);
+
+  const toggleBookmark = (id) => {
+    const updated = bookmarkedItems.includes(id)
+      ? bookmarkedItems.filter(p => p !== id)
+      : [...bookmarkedItems, id];
+    setBookmarkedItems(updated);
+    localStorage.setItem('studentBookmarks', JSON.stringify(updated));
+  };
+
+  // Stats calculation
+  const stats = useMemo(() => {
+    const total = announcements.length;
+    const important = announcements.filter(a => a.category === 'IMPORTANT').length;
+    const pinned = announcements.filter(a => a.isPinned).length;
+    
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    const thisWeek = announcements.filter(a => new Date(a.createdAt) > sevenDaysAgo).length;
+
+    return { total, important, thisWeek, pinned };
+  }, [announcements]);
+
+  // Featured banner announcement (latest pinned, or latest overall if no pinned)
+  const featuredAnnouncement = useMemo(() => {
+    if (announcements.length === 0) return null;
+    const pinned = announcements.filter(a => a.isPinned);
+    if (pinned.length > 0) {
+      return [...pinned].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0];
+    }
+    return [...announcements].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0];
+  }, [announcements]);
+
+  // Filter & sort logic
+  const filteredAndSorted = useMemo(() => {
+    let list = [...announcements];
+
+    // Filter by Category
+    if (activeFilter !== 'All') {
+      const typeMap = {
+        'Important': 'IMPORTANT',
+        'Events': 'EVENT',
+        'Courses': 'COURSE',
+        'System': 'SYSTEM'
+      };
+      list = list.filter(a => a.category === typeMap[activeFilter]);
+    }
+
+    // Filter by Search
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      list = list.filter(a => 
+        a.title?.toLowerCase().includes(q) ||
+        a.description?.toLowerCase().includes(q) ||
+        a.content?.toLowerCase().includes(q) ||
+        a.authorName?.toLowerCase().includes(q) ||
+        a.category?.toLowerCase().includes(q)
+      );
+    }
+
+    // Sort: Pinned first, then latest by date
+    list.sort((a, b) => {
+      if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1;
+      return new Date(b.createdAt) - new Date(a.createdAt);
+    });
+
+    return list;
+  }, [announcements, activeFilter, search]);
+
+  // Exclude featured banner announcement from the main timeline scroll to avoid duplication
+  const timelineAnnouncements = useMemo(() => {
+    return filteredAndSorted.filter(a => a._id !== featuredAnnouncement?._id);
+  }, [filteredAndSorted, featuredAnnouncement]);
+
+  const getRelativeTime = (dateStr) => {
+    const d = new Date(dateStr);
+    const now = new Date();
+    const diffMs = now - d;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+    
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays === 1) return 'Yesterday';
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+  };
 
   return (
-    <div style={{ backgroundColor: '#faf9f7', minHeight: '100vh', padding: '40px 28px 80px' }}>
-      <style>{`
-        :root {
-          --ink: #161522;
-          --ink-soft: #5b5a6e;
-          --paper: #faf9f7;
-          --card: #ffffff;
-          --line: #eae8e3;
-          --primary: #4a3aff;
-          --primary-deep: #241a8f;
-          --amber: #f2994a;
-          --teal: #0fa39a;
-          --slate: #7c8291;
-          --radius: 16px;
-        }
-        .announcements-wrap { max-width: 1180px; margin: 0 auto; }
-        .top-section { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 28px; gap: 20px; flex-wrap: wrap; }
-        .eyebrow { font-family: 'IBM Plex Mono', monospace; font-size: 12px; letter-spacing: 0.12em; color: var(--primary); text-transform: uppercase; margin-bottom: 6px; }
-        .header-content h1 { font-family: 'Space Grotesk', sans-serif; font-size: 38px; margin: 0 0 6px; letter-spacing: -0.01em; color: var(--ink); }
-        .header-content p { color: var(--ink-soft); margin: 0; font-size: 15px; }
-        .back-btn { border: 1px solid var(--line); background: var(--card); padding: 10px 18px; border-radius: 999px; font-weight: 600; font-size: 14px; cursor: pointer; display: flex; align-items: center; gap: 6px; color: var(--ink); }
-        .back-btn:hover { background: #f5f5f5; }
-        .grid-layout { display: grid; grid-template-columns: 1fr 320px; gap: 24px; align-items: start; }
-        @media (max-width: 900px) { .grid-layout { grid-template-columns: 1fr; } }
-        .featured-card { position: relative; border-radius: var(--radius); padding: 32px; background: linear-gradient(135deg, var(--primary) 0%, var(--primary-deep) 100%); color: #fff; overflow: hidden; margin-bottom: 22px; }
-        .featured-card::after { content: ''; position: absolute; right: -60px; top: -60px; width: 220px; height: 220px; border-radius: 50%; background: rgba(255,255,255,0.08); }
-        .tag-row { display: flex; gap: 8px; margin-bottom: 14px; position: relative; z-index: 1; }
-        .pill { font-family: 'IBM Plex Mono', monospace; font-size: 11px; letter-spacing: 0.06em; padding: 5px 10px; border-radius: 999px; background: rgba(255,255,255,0.18); text-transform: uppercase; }
-        .featured-card h2 { font-family: 'Space Grotesk', sans-serif; font-size: 26px; margin: 0 0 10px; line-height: 1.2; position: relative; z-index: 1; }
-        .featured-card p { max-width: 560px; color: rgba(255,255,255,0.85); font-size: 15px; line-height: 1.55; margin: 0 0 20px; position: relative; z-index: 1; }
-        .featured-meta { display: flex; gap: 18px; flex-wrap: wrap; font-size: 13px; color: rgba(255,255,255,0.75); margin-bottom: 22px; position: relative; z-index: 1; }
-        .featured-meta span { display: flex; align-items: center; gap: 6px; }
-        .cta { background: #fff; color: var(--primary-deep); border: none; padding: 12px 22px; border-radius: 999px; font-weight: 700; font-size: 14px; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; position: absolute; bottom: 24px; right: 32px; z-index: 2; }
-        .cta:hover { background: #f0f0f0; }
-        .filters { display: flex; gap: 8px; margin-bottom: 22px; flex-wrap: wrap; }
-        .filter-btn { border: 1px solid var(--line); background: var(--card); padding: 9px 16px; border-radius: 999px; font-size: 13px; font-weight: 600; color: var(--ink-soft); cursor: pointer; }
-        .filter-btn.active { background: var(--ink); color: #fff; border-color: var(--ink); }
-        .timeline { position: relative; }
-        .timeline-item { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 18px 20px; margin-bottom: 14px; display: flex; align-items: flex-start; gap: 16px; position: relative; }
-        .timeline-item::before { content: ''; position: absolute; left: -28px; top: 24px; width: 12px; height: 12px; border-radius: 50%; background: var(--dot-color); box-shadow: 0 0 0 4px var(--paper); }
-        .item-icon { width: 40px; height: 40px; border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 20px; }
-        .item-content { flex: 1; }
-        .item-category { font-family: 'IBM Plex Mono', monospace; font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--cat-color); display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
-        .item-title { margin: 0 0 6px; font-size: 16.5px; font-family: 'Space Grotesk', sans-serif; color: var(--ink); font-weight: 600; }
-        .item-desc { margin: 0 0 10px; color: var(--ink-soft); font-size: 14px; line-height: 1.5; }
-        .item-footer { display: flex; justify-content: space-between; align-items: center; font-size: 12.5px; color: #9a98a8; }
-        .item-meta { display: flex; gap: 14px; align-items: center; }
-        .save-btn { border: none; background: none; cursor: pointer; color: #c8c6d4; font-size: 18px; }
-        .save-btn.pinned { color: var(--primary); }
-        .load-more { width: 100%; text-align: center; font-size: 14px; font-weight: 600; color: var(--ink-soft); padding: 16px; border: none; background: none; cursor: pointer; }
-        .side-card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 22px; margin-bottom: 20px; }
-        .side-card h4 { font-family: 'Space Grotesk', sans-serif; margin: 0 0 16px; font-size: 16px; color: var(--ink); }
-        .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-        .stat { border-radius: 12px; padding: 14px; }
-        .stat-num { font-family: 'Space Grotesk', sans-serif; font-size: 22px; font-weight: 700; color: var(--ink); }
-        .stat-label { font-size: 12px; color: var(--ink-soft); margin-top: 2px; }
-        .stat.violet { background: #efedff; }
-        .stat.amber { background: #fff3e7; }
-        .stat.teal { background: #e6f8f6; }
-        .stat.slate { background: #f1f2f5; }
-        .qlink { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-top: 1px solid var(--line); font-size: 14px; cursor: pointer; text-decoration: none; color: var(--ink); }
-        .qlink:hover .qlink-text { color: var(--primary); }
-        .qlink:first-of-type { border-top: none; padding-top: 0; }
-        .qlink-icon { width: 32px; height: 32px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
-        .qlink-text { font-weight: 600; }
-        .qlink-desc { font-size: 12.5px; color: var(--ink-soft); margin-top: 2px; }
-        .qlink-arrow { color: #c8c6d4; }
-        .notification-card { background: linear-gradient(135deg, #efedff 0%, #f7eefb 100%); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px; position: relative; overflow: hidden; }
-        .notification-card h3 { margin: 0 0 8px; font-family: 'Space Grotesk', sans-serif; font-size: 14px; color: var(--ink); font-weight: 600; }
-        .notification-card p { margin: 0 0 16px; font-size: 12px; color: var(--ink-soft); line-height: 1.5; }
-        .notify-btn { background: var(--ink); color: #fff; border: none; padding: 10px 16px; border-radius: 999px; font-size: 12px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
-        .notify-btn:hover { background: var(--ink-soft); }
-      `}
+    <div className="min-h-full bg-[#faf9f7] px-4 py-10 sm:px-6 lg:px-10">
+      <div className="mx-auto max-w-[1180px]">
+        
+        {/* Header Section */}
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between mb-8">
+          <div>
+            <div className="text-[11px] tracking-[0.32em] uppercase text-[#4a3aff] mb-2 font-semibold">
+              Student · Chemy LMS
+            </div>
+            <h1 className="text-3xl md:text-4xl font-bold text-[#161522] mb-3">
+              Announcements
+            </h1>
+            <p className="max-w-2xl text-sm text-[#5b5a6e]">
+              Everything you need to know, in the order it happened.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => navigate(-1)}
+            className="inline-flex items-center gap-2 rounded-full border border-[#eae8e3] bg-white px-4 py-2 text-sm font-semibold text-[#161522] hover:bg-[#f5f5f5] transition"
+          >
+            <ArrowLeft size={14} /> Back to dashboard
+          </button>
+        </div>
+
+        {/* Search Bar */}
+        <div className="relative mb-6 max-w-md">
+          <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search announcements by title, content or author..."
+            className="w-full pl-10 pr-4 py-2.5 rounded-full border border-[#eae8e3] bg-white text-sm text-[#161522] focus:outline-none focus:ring-2 focus:ring-[#4a3aff]/20"
+          />
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-[1.7fr_0.9fr] gap-6">
+          <div className="space-y-6">
+            
+            {/* Loading Featured Skeleton */}
+            {loading && (
+              <div className="h-56 rounded-[28px] bg-gray-200 animate-pulse" />
+            )}
+
+            {/* Featured Banner (Latest Pinned / Latest overall) */}
+            {!loading && featuredAnnouncement && (
+              <div className="relative overflow-hidden rounded-[28px] bg-gradient-to-br from-[#4a3aff] to-[#241a8f] p-8 text-white shadow-lg">
+                <div className="flex flex-wrap gap-2 mb-4">
+                  <span className="rounded-full bg-white/20 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em]">
+                    ⭐ Featured
+                  </span>
+                  {featuredAnnouncement.isPinned && (
+                    <span className="rounded-full bg-rose-500 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em]">
+                      📌 Pinned
+                    </span>
+                  )}
+                  <span className="rounded-full bg-white/20 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em]">
+                    {categoryLabels[featuredAnnouncement.category] || 'NOTICE'}
+                  </span>
+                </div>
+                <h2 className="text-2xl font-bold mb-3">
+                  {categoryIcons[featuredAnnouncement.category] || '📢'} {featuredAnnouncement.title}
+                </h2>
+                <p className="max-w-xl text-sm text-white/80 leading-7 mb-6 line-clamp-3">
+                  {featuredAnnouncement.description || featuredAnnouncement.content}
+                </p>
+                <div className="flex flex-wrap gap-4 text-xs text-white/75 mb-6">
+                  <span>👤 {featuredAnnouncement.authorName}</span>
+                  <span>⏱️ {getRelativeTime(featuredAnnouncement.createdAt)}</span>
+                </div>
+                <button 
+                  onClick={() => setSelectedAnnouncement(featuredAnnouncement)}
+                  className="rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-[#241a8f] transition hover:bg-[#f3f3f3] shadow-md"
+                >
+                  View details →
+                </button>
+              </div>
+            )}
+
+            {/* Filters */}
+            <div className="flex flex-wrap gap-2">
+              {filters.map((filter) => (
+                <button
+                  key={filter}
+                  type="button"
+                  onClick={() => setActiveFilter(filter)}
+                  className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
+                    activeFilter === filter
+                      ? 'bg-[#161522] text-white border border-[#161522]'
+                      : 'bg-white text-[#5b5a6e] border border-[#eae8e3] hover:bg-[#f5f5f5]'
+                  }`}
+                >
+                  {filter}
+                </button>
+              ))}
+            </div>
+
+            {/* Error State */}
+            {error && (
+              <div className="rounded-[18px] border border-red-200 bg-red-50 p-6 flex flex-col gap-3 items-start">
+                <div className="flex items-center gap-2 text-red-700 font-semibold text-sm">
+                  <AlertCircle size={18} />
+                  <span>Failed to load announcements</span>
+                </div>
+                <p className="text-xs text-red-600 leading-relaxed">{error}</p>
+                <button
+                  onClick={loadAnnouncements}
+                  className="inline-flex items-center gap-1 text-xs font-bold text-red-700 hover:text-red-900 bg-white border border-red-200 px-3 py-1.5 rounded-lg shadow-sm"
+                >
+                  <Loader2 size={12} className="animate-spin-slow" /> Try again
+                </button>
+              </div>
+            )}
+
+            {/* Loading Skeletons */}
+            {loading && (
+              <div className="space-y-4">
+                {[1, 2, 3].map((n) => (
+                  <div key={n} className="rounded-[18px] border border-[#eae8e3] bg-white p-5 animate-pulse">
+                    <div className="h-4 bg-gray-200 rounded w-1/4 mb-3" />
+                    <div className="h-6 bg-gray-200 rounded w-3/4 mb-2" />
+                    <div className="h-4 bg-gray-200 rounded w-full mb-4" />
+                    <div className="flex justify-between items-center">
+                      <div className="h-4 bg-gray-200 rounded w-1/3" />
+                      <div className="h-6 bg-gray-200 rounded w-8" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Empty State */}
+            {!loading && timelineAnnouncements.length === 0 && !error && (
+              <div className="rounded-[18px] border border-[#eae8e3] bg-white p-12 text-center text-[#7c7b8a]">
+                <div className="text-4xl mb-3">📭</div>
+                <h3 className="font-semibold text-[#161522] mb-1">No announcements found</h3>
+                <p className="text-sm">We couldn't find any announcements matching the filters.</p>
+              </div>
+            )}
+
+            {/* Main Timeline */}
+            {!loading && timelineAnnouncements.length > 0 && (
+              <div className="space-y-4">
+                {timelineAnnouncements.map((item) => {
+                  const colors = colorMap[item.category] || colorMap.SYSTEM;
+                  return (
+                    <div
+                      key={item._id}
+                      onClick={() => setSelectedAnnouncement(item)}
+                      className="relative overflow-hidden rounded-[18px] border border-[#eae8e3] bg-white p-5 shadow-sm hover:shadow-md transition cursor-pointer"
+                    >
+                      <div className="absolute -left-4 top-6 h-3.5 w-3.5 rounded-full" style={{ backgroundColor: colors.dot }} />
+                      <div className="mb-3 flex justify-between items-start">
+                        <div className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: colors.text }}>
+                          <span>{categoryIcons[item.category]}</span>
+                          <span>{categoryLabels[item.category]}</span>
+                          {item.isPinned && (
+                            <span className="ml-2 bg-rose-50 text-rose-600 border border-rose-100 text-[9px] px-1.5 py-0.5 rounded font-bold">
+                              📌 PINNED
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <h3 className="text-lg font-semibold text-[#161522] mb-2">{item.title}</h3>
+                      <p className="text-sm leading-6 text-[#5b5a6e] mb-4 line-clamp-2">{item.description || item.content}</p>
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between text-sm text-[#7c7b8a]">
+                        <div className="flex flex-wrap gap-3 text-xs">
+                          <span>⏱️ {getRelativeTime(item.createdAt)}</span>
+                          <span>👤 By {item.authorName}</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation(); // prevent modal opening
+                            toggleBookmark(item._id);
+                          }}
+                          className={`text-lg transition p-1 hover:bg-gray-50 rounded-full ${
+                            bookmarkedItems.includes(item._id) ? 'text-[#4a3aff]' : 'text-[#c8c6d4] hover:text-[#4a3aff]'
+                          }`}
+                          aria-label={bookmarkedItems.includes(item._id) ? 'Remove bookmark' : 'Bookmark announcement'}
+                        >
+                          🔖
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Right Sidebar */}
+          <div className="space-y-5">
+            
+            {/* Stats Card */}
+            <div className="rounded-[24px] border border-[#eae8e3] bg-white p-6 shadow-sm">
+              <h4 className="text-base font-semibold text-[#161522] mb-4">Announcement stats</h4>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-2xl bg-[#f2efff] p-4">
+                  <div className="text-2xl font-bold text-[#161522]">{stats.total}</div>
+                  <div className="text-xs text-[#5b5a6e] mt-1">Total</div>
+                </div>
+                <div className="rounded-2xl bg-[#fff4e7] p-4">
+                  <div className="text-2xl font-bold text-[#161522]">{stats.important}</div>
+                  <div className="text-xs text-[#5b5a6e] mt-1">Important</div>
+                </div>
+                <div className="rounded-2xl bg-[#e7f6f3] p-4">
+                  <div className="text-2xl font-bold text-[#161522]">{stats.thisWeek}</div>
+                  <div className="text-xs text-[#5b5a6e] mt-1">This week</div>
+                </div>
+                <div className="rounded-2xl bg-[#f1f2f5] p-4">
+                  <div className="text-2xl font-bold text-[#161522]">{stats.pinned}</div>
+                  <div className="text-xs text-[#5b5a6e] mt-1">Pinned</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Quick Links Card */}
+            <div className="rounded-[24px] border border-[#eae8e3] bg-white p-6 shadow-sm">
+              <h4 className="text-base font-semibold text-[#161522] mb-4">Quick links</h4>
+              <a href="#" className="flex items-center justify-between border-t border-[#eae8e3] pt-4 first:border-t-0 first:pt-0 text-sm text-[#161522] transition hover:text-[#4a3aff]">
+                <div>
+                  <div className="font-semibold">Academic calendar</div>
+                  <div className="text-[#5b5a6e] text-xs mt-0.5">View important dates and deadlines</div>
+                </div>
+                <div className="text-[#c8c6d4]">›</div>
+              </a>
+              <a href="#" className="flex items-center justify-between border-t border-[#eae8e3] pt-4 text-sm text-[#161522] transition hover:text-[#4a3aff]">
+                <div>
+                  <div className="font-semibold">Exam schedule</div>
+                  <div className="text-[#5b5a6e] text-xs mt-0.5">Check upcoming exams</div>
+                </div>
+                <div className="text-[#c8c6d4]">›</div>
+              </a>
+              <a href="#" className="flex items-center justify-between border-t border-[#eae8e3] pt-4 text-sm text-[#161522] transition hover:text-[#4a3aff]">
+                <div>
+                  <div className="font-semibold">Assignment submission</div>
+                  <div className="text-[#5b5a6e] text-xs mt-0.5">View pending submissions</div>
+                </div>
+                <div className="text-[#c8c6d4]">›</div>
+              </a>
+            </div>
+
+            {/* Stay in the Loop Card */}
+            <div className="rounded-[24px] border border-[#eae8e3] bg-gradient-to-br from-[#efedff] to-[#f7eefb] p-6 shadow-sm">
+              <h3 className="text-base font-semibold text-[#161522] mb-3">Stay in the loop</h3>
+              <p className="text-xs text-[#5b5a6e] mb-5 leading-5">
+                Turn on notifications so you never miss an important campus announcement or timeline update.
+              </p>
+              <button className="inline-flex rounded-full bg-[#161522] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#5b5a6e]">
+                Enable notifications
+              </button>
+            </div>
+
+          </div>
+        </div>
+
+      </div>
+
+      {/* ── Announcement Detail Modal ── */}
+      {selectedAnnouncement && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm transition-all"
+          onClick={() => setSelectedAnnouncement(null)}
+        >
+          <div 
+            className="relative w-full max-w-xl bg-white rounded-3xl p-6 md:p-8 shadow-2xl overflow-hidden max-h-[90vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setSelectedAnnouncement(null)}
+              className="absolute top-4 right-4 p-2 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-700 transition"
+              aria-label="Close modal"
+            >
+              ✕
+            </button>
+
+            <div className="flex flex-wrap gap-2 mb-4 shrink-0">
+              <span className="rounded-full bg-blue-100 text-blue-800 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider">
+                {selectedAnnouncement.category}
+              </span>
+              {selectedAnnouncement.isPinned && (
+                <span className="rounded-full bg-rose-100 text-rose-800 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider">
+                  📌 Pinned
+                </span>
+              )}
+              {featuredAnnouncement?._id === selectedAnnouncement._id && (
+                <span className="rounded-full bg-amber-100 text-amber-800 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider">
+                  ⭐ Featured
+                </span>
+              )}
+            </div>
+
+            <h2 className="text-xl md:text-2xl font-bold text-[#161522] mb-3 leading-snug">
+              {selectedAnnouncement.title}
+            </h2>
+
+            <div className="flex items-center gap-4 text-xs text-[#7c7b8a] mb-5 border-b border-gray-100 pb-3 shrink-0">
+              <span>👤 {selectedAnnouncement.authorName}</span>
+              <span>⏱️ {new Date(selectedAnnouncement.createdAt).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}</span>
+            </div>
+
+            <div className="text-sm text-[#5b5a6e] leading-relaxed overflow-y-auto flex-1 pr-1 custom-scrollbar">
+              {selectedAnnouncement.description || selectedAnnouncement.content}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

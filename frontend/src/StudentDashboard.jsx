@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { LogOut, Menu, X, LayoutDashboard, BookOpen, Video, FileText, Award, Trophy, Bell, MessageCircle, User } from 'lucide-react';
-import BrandLogo from './components/BrandLogo';
+import StudentHeader from './components/StudentHeader';
 import Hackathon from './pages/Hackathon';
 import Announcement from './pages/Announcement';
 import Feedback from './pages/Feedback';
 import Certificates from './pages/Certificates';
 import UniversityPractical from './pages/UniversityPractical';
 import Profile from './pages/Profile';
+import StatsGrid from './components/StatsGrid';
 
 const MENU_ITEMS = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -142,7 +143,7 @@ export default function StudentDashboard() {
       <aside className={`fixed z-40 inset-y-0 left-0 w-72 max-w-[80vw] bg-white border-r border-gray-200 flex flex-col transition-transform duration-300 ease-in-out md:static md:translate-x-0 md:w-64 md:max-w-none ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="flex items-center justify-between px-5 h-16 border-b border-gray-200">
           <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-[#0B3D91] to-indigo-500" />
+            <img src="/src/assets/chemy-logo.png" alt="Chemy Logo" style={{ width: 32, height: 32, objectFit: 'contain', display: 'block' }} />
             <div>
               <div className="text-gray-900 text-lg font-semibold tracking-wide" style={{ fontFamily: "'Playfair Display', serif" }}>
                 Chemy
@@ -281,48 +282,7 @@ export default function StudentDashboard() {
 
           <div style={{ flex: 1, minWidth: 0 }} />
 
-          <button
-            type="button"
-            style={{
-              position: 'relative',
-              width: 44,
-              height: 44,
-              borderRadius: 16,
-              border: '1px solid rgba(15, 23, 42, 0.08)',
-              background: 'rgba(255,255,255,0.75)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer',
-              color: '#0F172A',
-              boxShadow: '0 10px 24px rgba(15, 23, 42, 0.08)',
-            }}
-            aria-label="Notifications"
-          >
-            <Bell size={18} />
-            <span style={{
-              position: 'absolute',
-              top: 5,
-              right: 5,
-              width: 16,
-              height: 16,
-              borderRadius: '9999px',
-              background: '#2563EB',
-              color: 'white',
-              fontSize: 10,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontWeight: 700,
-              boxShadow: '0 0 0 4px rgba(37, 99, 235, 0.12)',
-            }}>
-              3
-            </span>
-          </button>
-
-          <div style={{ width: 44, height: 44, borderRadius: 16, background: 'linear-gradient(135deg, #4A6DFF 0%, #2563EB 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 16px 35px rgba(37, 99, 235, 0.18)', cursor: 'pointer' }}>
-            <span style={{ color: 'white', fontWeight: 700, fontSize: 16 }}>{userInitial}</span>
-          </div>
+          <StudentHeader />
         </div>
 
         <div style={{ flex: 1, overflowY: 'auto', padding: isMobile ? 16 : 32 }}>
@@ -341,145 +301,117 @@ export default function StudentDashboard() {
           ) : (
             <>
               <div style={{ marginBottom: 32 }}>
-            <h1 style={{ fontSize: 28, fontWeight: 600, color: '#1F2937', margin: '0 0 8px 0' }}>Learning Dashboard</h1>
-            <p style={{ fontSize: 14, color: '#6B7280', margin: 0 }}>Empowering your technical journey in IoT & EV Engineering</p>
-          </div>
+                <h1 style={{ fontSize: 28, fontWeight: 600, color: '#1F2937', margin: '0 0 8px 0' }}>Learning Dashboard</h1>
+                <p style={{ fontSize: 14, color: '#6B7280', margin: 0 }}>Empowering your technical journey in IoT &amp; EV Engineering</p>
+              </div>
 
-          <div style={{
-            background: 'white',
-            border: '1px solid #E5E7EB',
-            borderRadius: 12,
-            padding: 20,
-            marginBottom: 32,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
               <div style={{
-                width: 56,
-                height: 56,
-                background: '#2563EB',
+                background: 'white',
+                border: '1px solid #E5E7EB',
                 borderRadius: 12,
+                padding: 20,
+                marginBottom: 32,
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'center',
-                color: 'white',
-                fontSize: 24,
+                justifyContent: 'space-between',
               }}>
-                📖
-              </div>
-              <div>
-                <h3 style={{ fontSize: 16, fontWeight: 600, color: '#1F2937', margin: 0 }}>Fermion Mirror LMS</h3>
-                <p style={{ fontSize: 13, color: '#6B7280', margin: '4px 0 0 0' }}>Access your courses on the high-performance secondary portal.</p>
-              </div>
-            </div>
-            <button style={{
-              padding: '5px 14px',
-              background: '#2563EB',
-              color: 'white',
-              border: 'none',
-              borderRadius: 7,
-              fontSize: 11,
-              fontWeight: 600,
-              cursor: 'pointer',
-              whiteSpace: 'nowrap',
-            }}>
-              Start Course / Open LMS →
-            </button>
-          </div>
-
-          {/* Fermion LMS stats row (matches provided screenshot) */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 24, marginBottom: 24 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, flex: 1 }}>
-              <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, padding: 20 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <div style={{ width: 44, height: 44, borderRadius: 12, background: '#EEF2FF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>📘</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                  <div style={{
+                    width: 56,
+                    height: 56,
+                    background: '#2563EB',
+                    borderRadius: 12,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: 'white',
+                    fontSize: 24,
+                  }}>
+                    📖
+                  </div>
                   <div>
-                    <div style={{ fontSize: 20, fontWeight: 700, color: '#111827' }}>0</div>
-                    <div style={{ fontSize: 11, fontWeight: 600, color: '#9CA3AF', textTransform: 'uppercase', marginTop: 4 }}>Enrolled Courses</div>
+                    <h3 style={{ fontSize: 16, fontWeight: 600, color: '#1F2937', margin: 0 }}>Fermion Mirror LMS</h3>
+                    <p style={{ fontSize: 13, color: '#6B7280', margin: '4px 0 0 0' }}>Access your courses on the high-performance secondary portal.</p>
                   </div>
                 </div>
-              </div>
-
-              <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, padding: 20 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <div style={{ width: 44, height: 44, borderRadius: 12, background: '#ECFDF5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>🏆</div>
-                  <div>
-                    <div style={{ fontSize: 20, fontWeight: 700, color: '#111827' }}>0</div>
-                    <div style={{ fontSize: 11, fontWeight: 600, color: '#9CA3AF', textTransform: 'uppercase', marginTop: 4 }}>Completed</div>
-                  </div>
-                </div>
-              </div>
-
-              <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, padding: 20 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <div style={{ width: 44, height: 44, borderRadius: 12, background: '#F3F4FF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>🎥</div>
-                  <div>
-                    <div style={{ fontSize: 20, fontWeight: 700, color: '#111827' }}>0%</div>
-                    <div style={{ fontSize: 11, fontWeight: 600, color: '#9CA3AF', textTransform: 'uppercase', marginTop: 4 }}>Avg. Progress</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div style={{ width: 260 }}>
-              <input placeholder="Filter courses..." style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: '1px solid #E5E7EB', background: '#FFFFFF' }} />
-            </div>
-          </div>
-
-          {/* Current Progress block */}
-          <div style={{ marginBottom: 32 }}>
-            <h2 style={{ fontSize: 16, fontWeight: 600, color: '#1F2937', margin: '0 0 12px 0' }}>Current Progress</h2>
-            <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, padding: '48px 32px', textAlign: 'center', color: '#9CA3AF' }}>
-              <div style={{ fontSize: 48, marginBottom: 16 }}>📚</div>
-              <p style={{ fontSize: 14, fontWeight: 500, color: '#6B7280', marginBottom: 4 }}>Your course list is currently empty.</p>
-              <p style={{ fontSize: 12, color: '#9CA3AF' }}>Explore the catalog to start your technical training.</p>
-            </div>
-          </div>
-
-          <div style={{
-            background: 'white',
-            border: '1px solid #E5E7EB',
-            borderRadius: 16,
-            padding: isMobile ? 16 : 24,
-            marginBottom: 32,
-          }}>
-            <div style={{ background: '#F9FAFB', borderRadius: 12, padding: 20 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                <div style={{ fontSize: 14, fontWeight: 700, color: '#111827' }}>Account Details</div>
-                <div style={{ 
-                  fontSize: 12, 
-                  fontWeight: 700, 
-                  color: (localStorage.getItem('userRole') || 'student') === 'trainer' ? '#7C3AED' : '#2563EB', 
-                  background: (localStorage.getItem('userRole') || 'student') === 'trainer' ? '#F5F3FF' : '#EFF6FF', 
-                  padding: '6px 10px', 
-                  borderRadius: 999,
-                  textTransform: 'uppercase'
+                <button style={{
+                  padding: '5px 14px',
+                  background: '#2563EB',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: 7,
+                  fontSize: 11,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
                 }}>
-                  {localStorage.getItem('userRole') || 'student'} ACCOUNT
+                  Start Course / Open LMS →
+                </button>
+              </div>
+
+              {/* Fermion LMS stats row (matches provided screenshot) */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 24, marginBottom: 24, flexWrap: 'wrap' }}>
+                <div style={{ flex: 1, minWidth: '280px' }}>
+                  <StatsGrid enrolled={0} completed={0} avgProgress={0} />
+                </div>
+
+                <div style={{ width: '100%', maxWidth: 260 }}>
+                  <input placeholder="Filter courses..." style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: '1px solid #E5E7EB', background: '#FFFFFF' }} />
                 </div>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                <div>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: '#6B7280', textTransform: 'uppercase', marginBottom: 6 }}>Full Name</div>
-                  <div style={{ fontSize: 15, fontWeight: 600, color: '#111827' }}>{studentData.fullName}</div>
-                </div>
-                <div>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: '#6B7280', textTransform: 'uppercase', marginBottom: 6 }}>Email Address</div>
-                  <div style={{ fontSize: 15, fontWeight: 600, color: '#111827' }}>{studentData.email}</div>
-                </div>
-                <div>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: '#6B7280', textTransform: 'uppercase', marginBottom: 6 }}>Institutional Affiliation</div>
-                  <div style={{ fontSize: 15, fontWeight: 600, color: '#111827' }}>{studentData.institution || studentData.collegeName || 'N/A'}</div>
-                </div>
-                <div>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: '#6B7280', textTransform: 'uppercase', marginBottom: 6 }}>Access Level</div>
-                  <div style={{ fontSize: 15, fontWeight: 600, color: '#111827' }}>{localStorage.getItem('userRole') || 'student'}</div>
+
+              {/* Current Progress block */}
+              <div style={{ marginBottom: 32 }}>
+                <h2 style={{ fontSize: 16, fontWeight: 600, color: '#1F2937', margin: '0 0 12px 0' }}>Current Progress</h2>
+                <div style={{ background: 'white', border: '1px solid #E5E7EB', borderRadius: 12, padding: '48px 32px', textAlign: 'center', color: '#9CA3AF' }}>
+                  <div style={{ fontSize: 48, marginBottom: 16 }}>📚</div>
+                  <p style={{ fontSize: 14, fontWeight: 500, color: '#6B7280', marginBottom: 4 }}>Your course list is currently empty.</p>
+                  <p style={{ fontSize: 12, color: '#9CA3AF' }}>Explore the catalog to start your technical training.</p>
                 </div>
               </div>
-            </div>
-          </div>
+
+              <div style={{
+                background: 'white',
+                border: '1px solid #E5E7EB',
+                borderRadius: 16,
+                padding: isMobile ? 16 : 24,
+                marginBottom: 32,
+              }}>
+                <div style={{ background: '#F9FAFB', borderRadius: 12, padding: 20 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: '#111827' }}>Account Details</div>
+                    <div style={{
+                      fontSize: 12,
+                      fontWeight: 700,
+                      color: (localStorage.getItem('userRole') || 'student') === 'trainer' ? '#7C3AED' : '#2563EB',
+                      background: (localStorage.getItem('userRole') || 'student') === 'trainer' ? '#F5F3FF' : '#EFF6FF',
+                      padding: '6px 10px',
+                      borderRadius: 999,
+                      textTransform: 'uppercase'
+                    }}>
+                      {localStorage.getItem('userRole') || 'student'} ACCOUNT
+                    </div>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                    <div>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: '#6B7280', textTransform: 'uppercase', marginBottom: 6 }}>Full Name</div>
+                      <div style={{ fontSize: 15, fontWeight: 600, color: '#111827' }}>{studentData.fullName}</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: '#6B7280', textTransform: 'uppercase', marginBottom: 6 }}>Email Address</div>
+                      <div style={{ fontSize: 15, fontWeight: 600, color: '#111827' }}>{studentData.email}</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: '#6B7280', textTransform: 'uppercase', marginBottom: 6 }}>Institutional Affiliation</div>
+                      <div style={{ fontSize: 15, fontWeight: 600, color: '#111827' }}>{studentData.institution || studentData.collegeName || 'N/A'}</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: '#6B7280', textTransform: 'uppercase', marginBottom: 6 }}>Access Level</div>
+                      <div style={{ fontSize: 15, fontWeight: 600, color: '#111827' }}>{localStorage.getItem('userRole') || 'student'}</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </>
           )}
         </div>
